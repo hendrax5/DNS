@@ -20,7 +20,7 @@ echo ""
 
 # 3. Membangun dan menyalakan server secara Zero-Downtime
 echo "[3/3] Membangun (Build) dan Menjalankan NetShield Container..."
-docker-compose up -d --build
+docker compose up -d --build
 
 echo ""
 echo "=============================================================="
