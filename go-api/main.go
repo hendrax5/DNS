@@ -60,7 +60,9 @@ type ForwarderRequest struct {
 
 type FeedStatus struct {
 	Name    string `json:"name"`
+	URL     string `json:"url"`
 	Status  string `json:"status"`
+	Error   string `json:"error"`
 	Records int    `json:"records"`
 	Time    string `json:"time"`
 }
@@ -68,6 +70,7 @@ type FeedStatus struct {
 var (
 	feedStatuses []FeedStatus
 	feedMutex    sync.RWMutex
+	forceSync    = make(chan bool, 1)
 
 	wsClients    = make(map[*websocket.Conn]bool)
 	clientMutex  sync.Mutex
@@ -297,7 +300,9 @@ func GetPDNSStats(c *fiber.Ctx) error {
 			}
 			currentStatus = append(currentStatus, FeedStatus{
 				Name:    fmt.Sprintf("Zone: %s", f.ZoneName),
+				URL:     f.MasterIP,
 				Status:  statusStr,
+				Error:   "",
 				Records: 0,
 				Time:    "Native DNS",
 			})
@@ -354,6 +359,11 @@ func SaveRPZFeeds(c *fiber.Ctx) error {
 	err := ioutil.WriteFile("/etc/powerdns/rpz_feeds.txt", []byte(urlsStr), 0644)
 	if err != nil {
 		fmt.Println("Warning: Failed to write RPZ Feeds file:", err)
+	}
+
+	select {
+	case forceSync <- true:
+	default:
 	}
 
 	return c.JSON(fiber.Map{"message": "RPZ Feeds updated successfully"})
@@ -476,13 +486,13 @@ func syncRPZWorker() {
 				}
 
 				if !f.Enabled {
-					newStatuses = append(newStatuses, FeedStatus{Name: displayName, Status: "Disabled", Records: 0, Time: time.Now().Format("15:04:05")})
+					newStatuses = append(newStatuses, FeedStatus{Name: displayName, URL: u, Status: "Disabled", Error: "", Records: 0, Time: time.Now().Format("15:04:05")})
 					continue
 				}
 
 				req, err := http.NewRequest("GET", u, nil)
 				if err != nil {
-					newStatuses = append(newStatuses, FeedStatus{Name: displayName, Status: "Error HTTP", Records: 0, Time: time.Now().Format("15:04:05")})
+					newStatuses = append(newStatuses, FeedStatus{Name: displayName, URL: u, Status: "Error HTTP", Error: err.Error(), Records: 0, Time: time.Now().Format("15:04:05")})
 					continue
 				}
 				
@@ -505,16 +515,22 @@ func syncRPZWorker() {
 
 					newStatuses = append(newStatuses, FeedStatus{
 						Name:    displayName,
+						URL:     u,
 						Status:  "Synced & Parsed",
+						Error:   "",
 						Records: validCount,
 						Time:    time.Now().Format("15:04:05"),
 					})
 				} else {
 					statusText := "Failed to fetch"
+					errStr := "Unknown error"
 					if resp != nil {
 						statusText = fmt.Sprintf("HTTP %d", resp.StatusCode)
+						errStr = fmt.Sprintf("Server returned status: %v", resp.Status)
+					} else if err != nil {
+						errStr = err.Error()
 					}
-					newStatuses = append(newStatuses, FeedStatus{Name: displayName, Status: statusText, Records: 0, Time: time.Now().Format("15:04:05")})
+					newStatuses = append(newStatuses, FeedStatus{Name: displayName, URL: u, Status: statusText, Error: errStr, Records: 0, Time: time.Now().Format("15:04:05")})
 				}
 			}
 
@@ -530,7 +546,11 @@ func syncRPZWorker() {
 			interval = res
 		}
 
-		time.Sleep(time.Duration(interval) * time.Minute)
+		select {
+		case <-time.After(time.Duration(interval) * time.Minute):
+		case <-forceSync:
+			// Instantly wakeup and run sync!
+		}
 	}
 }
 

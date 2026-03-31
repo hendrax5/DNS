@@ -561,8 +561,11 @@ function App() {
                 
                 <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
                   <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
-                    {rpzFeeds.map((feed, i) => (
-                      <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
+                    {rpzFeeds.map((feed, i) => {
+                      const syncData = stats?.rpz_status?.find(s => s.url === feed.url);
+                      const isError = syncData && syncData.status !== "Synced & Parsed" && syncData.status !== "Disabled" && syncData.status !== "Mock";
+                      return (
+                      <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner flex-wrap">
                         <input
                            type="text"
                            value={feed.url}
@@ -571,9 +574,24 @@ function App() {
                                next[i].url = e.target.value;
                                setRpzFeeds(next);
                            }}
-                           className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
+                           className="flex-1 min-w-[200px] bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
                            placeholder="https://..."
                         />
+                        {syncData && (
+                          <div className="flex-none px-2 flex items-center gap-1.5">
+                            {isError ? (
+                              <span className="text-xs bg-red-500/10 text-red-400 font-semibold px-2 py-1 rounded flex items-center gap-1 shadow-sm border border-red-500/20" title={syncData.error}>
+                                ⚠️ {syncData.status}
+                              </span>
+                            ) : syncData.status === "Synced & Parsed" ? (
+                              <span className="text-xs bg-emerald-500/10 text-emerald-400 font-semibold px-2 py-1 rounded flex items-center gap-1 shadow-sm border border-emerald-500/20">
+                                <CheckCircle2 className="w-3 h-3" /> {syncData.records.toLocaleString()} Baris
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-500 font-semibold px-2 py-1">{syncData.status}</span>
+                            )}
+                          </div>
+                        )}
                         <button
                            onClick={() => {
                                const next = [...rpzFeeds];
@@ -590,8 +608,13 @@ function App() {
                         >
                            ✕
                         </button>
+                        {isError && syncData.error && (
+                          <div className="w-full mt-1 text-[10px] text-red-400/80 font-mono tracking-wide px-1 truncate">
+                            {syncData.error}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )})}
                     <button
                         onClick={() => setRpzFeeds([...rpzFeeds, {url: '', enabled: true}])}
                         className="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center justify-center py-2.5 border border-dashed border-blue-900/50 rounded-lg cursor-pointer transition-colors bg-blue-950/10 hover:bg-blue-950/30"
