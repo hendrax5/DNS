@@ -369,7 +369,7 @@ function App() {
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex items-center justify-between gap-6">
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">
-                  <Globe className="w-4 h-4" /> Domain Diagnostics Checker
+                  <Globe className="w-4 h-4" /> Diagnostik Domain (Checker)
                 </h3>
                 <p className="text-xs text-slate-500">Ketahui secara instan apakah domain tertentu dibidik oleh RPZ/AXFR ISP/Kominfo.</p>
               </div>
@@ -380,7 +380,7 @@ function App() {
                   onKeyDown={e => {
                     if (e.key === 'Enter') document.getElementById('btnCheckDomain').click()
                   }}
-                  placeholder="e.g. reddit.com" 
+                  placeholder="misal. x.com" 
                   className="flex-1 bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500/50 shadow-inner"
                 />
                 <button 
@@ -388,7 +388,7 @@ function App() {
                   onClick={async () => {
                     const btn = document.getElementById('btnCheckDomain');
                     const origText = btn.innerText;
-                    btn.innerText = 'Checking...';
+                    btn.innerText = 'Memeriksa...';
                     try {
                       const domain = document.getElementById('checkDomainInput').value.trim();
                       if(!domain) return;
@@ -407,7 +407,7 @@ function App() {
                   }}
                   className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white rounded-lg transition-colors shadow-[0_0_15px_rgba(79,70,229,0.3)] whitespace-nowrap cursor-pointer"
                 >
-                  Verify Domain
+                  Cek Domain
                 </button>
               </div>
             </div>
@@ -417,7 +417,7 @@ function App() {
               {/* Traffic Chart */}
               <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-xl">
                 <h3 className="text-lg font-semibold flex items-center gap-2 text-slate-200 mb-6">
-                  <BarChart2 className="w-5 h-5 text-slate-400" /> Traffic Trend (60s)
+                  <BarChart2 className="w-5 h-5 text-slate-400" /> Tren Lalu Lintas (60 Detik)
                 </h3>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -439,8 +439,8 @@ function App() {
                         contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', color: '#f8fafc'}}
                         cursor={{stroke: '#334155', strokeWidth: 1, strokeDasharray: '4 4'}}
                       />
-                      <Area type="monotone" name="Total Queries" dataKey="qps" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorQps)" animationDuration={300} isAnimationActive={false} />
-                      <Area type="monotone" name="Blocked Queries" dataKey="blocked" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorBlocked)" animationDuration={300} isAnimationActive={false} />
+                      <Area type="monotone" name="Total Permintaan" dataKey="qps" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorQps)" animationDuration={300} isAnimationActive={false} />
+                      <Area type="monotone" name="Diblokir RPZ/ACL" dataKey="blocked" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorBlocked)" animationDuration={300} isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -461,7 +461,7 @@ function App() {
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-xs text-slate-500">
-                        <span>{feed.records !== undefined ? feed.records.toLocaleString() + " Valid Domains" : "~2.4M Signatures"}</span>
+                        <span>{feed.records !== undefined ? feed.records.toLocaleString() + " Domain Valid" : "~2.4M Signatures"}</span>
                         <span>{feed.time}</span>
                       </div>
                     </div>
@@ -473,11 +473,11 @@ function App() {
             {/* Live Intelligence Stream */}
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl mt-6">
               <h3 className="text-lg font-semibold flex items-center gap-2 text-slate-200 mb-4">
-                <Activity className="w-5 h-5 text-emerald-400" /> Live Query Stream
+                <Activity className="w-5 h-5 text-emerald-400" /> Pemantauan Kueri Langsung (Live Stream)
               </h3>
               <div className="bg-slate-950 font-mono text-xs rounded-lg p-4 h-64 overflow-y-auto border border-slate-800">
                 {liveLogs.length === 0 ? (
-                  <span className="text-slate-500">Waiting for queries...</span>
+                  <span className="text-slate-500">Menunggu kueri masuk...</span>
                 ) : (
                   liveLogs.map((log, i) => (
                     <div key={i} className="flex gap-4 py-1.5 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/20 items-center">
@@ -495,23 +495,23 @@ function App() {
             {/* Top Analytics */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Top Clients Insight</h3>
+                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Wawasan Klien Teratas (Top Clients)</h3>
                  <div className="space-y-3">
                    {topAnalytics.clients.map((c, i) => (
                      <div key={i} className="flex justify-between items-center px-4 py-2 bg-slate-950 rounded-lg border border-slate-800/50">
                        <span className="text-blue-400 text-sm font-mono flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{c.name}</span>
                        <div className="flex gap-2 text-xs font-medium">
-                         <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{c.allow ? c.allow.toLocaleString() : 0} Allow</span>
-                         <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">{c.block ? c.block.toLocaleString() : 0} Block</span>
+                         <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{c.allow ? c.allow.toLocaleString() : 0} Diizinkan</span>
+                         <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">{c.block ? c.block.toLocaleString() : 0} Diblokir</span>
                        </div>
                      </div>
                    ))}
-                   {topAnalytics.clients.length === 0 && <span className="text-slate-500 text-sm">No data yet...</span>}
+                   {topAnalytics.clients.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
                  </div>
                </div>
                
                <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Top Queried Domains</h3>
+                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Domain Terbanyak Diakses</h3>
                  <div className="space-y-3">
                    {topAnalytics.domains.map((d, i) => (
                      <div key={i} className="flex justify-between items-center px-4 py-2 bg-slate-950 rounded-lg border border-slate-800/50">
@@ -519,7 +519,7 @@ function App() {
                        <span className="text-slate-400 font-medium text-sm">{d.count.toLocaleString()}</span>
                      </div>
                    ))}
-                   {topAnalytics.domains.length === 0 && <span className="text-slate-500 text-sm">No data yet...</span>}
+                   {topAnalytics.domains.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
                  </div>
                </div>
             </div>
@@ -527,15 +527,15 @@ function App() {
         ) : (
           <div className="space-y-6 flex flex-col h-full">
             <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Security Policies</h1>
-              <p className="text-slate-400 text-sm mt-1">Manage network access and regulatory compliance routing.</p>
+              <h1 className="text-2xl font-bold text-white tracking-tight">Kebijakan Keamanan</h1>
+              <p className="text-slate-400 text-sm mt-1">Kelola perutean intelijen ancaman, akses jaringan, dan kepatuhan keamanan.</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-4">
-              <button onClick={() => setAdminTab('threats')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'threats' ? 'bg-fuchsia-600 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldAlert className="w-4 h-4 inline-block mr-2" />Threat Intel & RPZ</button>
-              <button onClick={() => setAdminTab('forwarding')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'forwarding' ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />Global Forwarding</button>
-              <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Access Control</button>
-              <button onClick={() => setAdminTab('options')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'options' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Server className="w-4 h-4 inline-block mr-2" />Security Options</button>
+              <button onClick={() => setAdminTab('threats')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'threats' ? 'bg-fuchsia-600 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldAlert className="w-4 h-4 inline-block mr-2" />Intelijen Ancaman & RPZ</button>
+              <button onClick={() => setAdminTab('forwarding')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'forwarding' ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />Penerusan Global</button>
+              <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Kontrol Akses</button>
+              <button onClick={() => setAdminTab('options')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'options' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Server className="w-4 h-4 inline-block mr-2" />Opsi Keamanan</button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -543,15 +543,15 @@ function App() {
               {/* === TAB: THREATS === */}
               {adminTab === 'threats' && (
                 <>
-                  {/* RPZ Feeds Config */}
+              {/* Laman Labuh Drop/Rewrite Config */}
               <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-slate-800">
                   <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
                     <Globe className="w-5 h-5 text-slate-400" />
-                    Regulatory Override (Laman Labuh)
+                    Bypass Aturan (Laman Labuh)
                   </h2>
                   <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                    Set the target IP addresses for traffic intercepting blocked domains. Multiple IPs act as a load-balancing pool.
+                    Atur alamat IP target untuk mencegat lalu lintas domain yang diblokir RPZ. Banyak IP akan bertindak sebagai kumpulan load-balancing.
                   </p>
                 </div>
                 
@@ -568,7 +568,7 @@ function App() {
                                setLamanLabuh(next);
                            }}
                            className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
-                           placeholder="IP Address"
+                           placeholder="Alamat IP"
                         />
                         <button
                            onClick={() => setLamanLabuh(lamanLabuh.filter((_, idx) => idx !== i))}
@@ -591,60 +591,7 @@ function App() {
                     onClick={saveLamanLabuh}
                     className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
                   >
-                    Commit Configuration
-                  </button>
-                </div>
-              </div>
-
-              {/* ACL Config */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                <div className="p-6 border-b border-slate-800">
-                  <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                    <Lock className="w-5 h-5 text-slate-400" />
-                    Query Access Control (ACL)
-                  </h2>
-                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                    Define authorized IP subnets (CIDR) permitted to utilize this DNS resolver. Unauthorized requests are hard-dropped.
-                  </p>
-                </div>
-                
-                <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
-                    {aclList.map((acl, i) => (
-                      <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
-                        <input
-                           type="text"
-                           value={acl}
-                           onChange={e => {
-                               const next = [...aclList];
-                               next[i] = e.target.value;
-                               setAclList(next);
-                           }}
-                           className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
-                           placeholder="CIDR (e.g. 192.168.1.0/24)"
-                        />
-                        <button
-                           onClick={() => setAclList(aclList.filter((_, idx) => idx !== i))}
-                           className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
-                        >
-                           ✕
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                        onClick={() => setAclList([...aclList, ''])}
-                        className="mt-2 text-sm text-emerald-400 hover:text-emerald-300 flex items-center justify-center py-2.5 border border-dashed border-emerald-900/50 rounded-lg cursor-pointer transition-colors bg-emerald-950/10 hover:bg-emerald-950/30"
-                    >
-                        + Tambah Subnet Baru
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
-                  <button 
-                    onClick={saveACL}
-                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
-                  >
-                    Enforce ACL
+                    Simpan Konfigurasi
                   </button>
                 </div>
               </div>
@@ -654,10 +601,10 @@ function App() {
                     <div className="p-6 border-b border-slate-800">
                       <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
                         <DatabaseIcon className="w-5 h-5 text-indigo-400" />
-                        AXFR/IXFR DNS Masters
+                        AXFR/IXFR DNS Master
                       </h2>
                       <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                        Native Protocol Zone Transfer directly to BSSN/Kominfo servers (bypasses HTTP syncs).
+                        Protokol Zone Transfer Asli yang terhubung langsung ke Server Pusat BSSN/Kominfo (melewati HTTP).
                       </p>
                     </div>
                     
@@ -730,10 +677,10 @@ function App() {
                 <div className="p-6 border-b border-slate-800">
                   <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
                     <ShieldAlert className="w-5 h-5 text-slate-400" />
-                    DNS Master Feeds
+                    Bahan Baku DNS (Feeds)
                   </h2>
                   <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                    Enter the URL to download RPZ zone files (e.g. Kominfo Trust Positif) or custom blocklists.
+                    Masukkan URL untuk mengunduh arsip zona RPZ (misal. Kominfo Trust Positif) atau daftar blokir khusus format blok.
                   </p>
                 </div>
                 
@@ -802,7 +749,7 @@ function App() {
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
-                     <span className="text-xs text-slate-400 font-bold tracking-widest uppercase">Auto Sync Interval</span>
+                     <span className="text-xs text-slate-400 font-bold tracking-widest uppercase">Sinkronisasi Otomatis Interval</span>
                      <div className="flex items-center gap-2">
                         <input 
                            type="number" 
@@ -811,7 +758,7 @@ function App() {
                            className="w-16 bg-[#0b1120] border border-slate-700/50 rounded px-2 py-1.5 text-center text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500/50 transition-colors"
                            min="1"
                         />
-                        <span className="text-xs text-slate-500 font-medium">Minutes</span>
+                        <span className="text-xs text-slate-500 font-medium">Menit</span>
                      </div>
                   </div>
                 </div>
@@ -820,7 +767,7 @@ function App() {
                     onClick={saveRPZ}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
                   >
-                    Save & Sync Feeds
+                    Simpan & Tarik Data
                   </button>
                 </div>
               </div>
@@ -831,10 +778,10 @@ function App() {
                   <div>
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
                       <ExternalLink className="w-5 h-5 text-fuchsia-400" />
-                      Compiled RPZ Database Search
+                      Mesin Pencarian Database RPZ
                     </h2>
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                      Search through millions of loaded Intelligence Feeds to verify if a specific domain or TLD is blocked.
+                      Lakukan diagnosa cek Domain di jutaan arsip Intelijen untuk memastikan apakah domain/TLD telah diblokir.
                     </p>
                   </div>
                 </div>
@@ -845,7 +792,7 @@ function App() {
                       type="text" 
                       value={searchRpzQuery}
                       onChange={e => setSearchRpzQuery(e.target.value)}
-                      placeholder="e.g. reddit.com or pornhub" 
+                      placeholder="misal. x.com atau judi" 
                       className="flex-1 max-w-lg bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm font-mono text-slate-300 focus:outline-none focus:border-fuchsia-500/50 shadow-inner"
                     />
                     <button 
@@ -853,21 +800,21 @@ function App() {
                       disabled={isSearchingRpz}
                       className="px-6 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.2)] transition-all duration-200 cursor-pointer whitespace-nowrap"
                     >
-                      {isSearchingRpz ? 'Searching...' : 'Search Database'}
+                      {isSearchingRpz ? 'Mencari...' : 'Cari di Database'}
                     </button>
                   </form>
                   
                   {searchRpzResults.length > 0 && (
                     <div className="mt-4 border border-slate-800 rounded-lg overflow-hidden">
                       <div className="bg-slate-900 p-2 border-b border-slate-800 text-xs font-semibold tracking-wider text-slate-400 uppercase">
-                        Search Results ({searchRpzResults.length} matches)
+                        Hasil Pencarian ({searchRpzResults.length} data cocok)
                       </div>
                       <div className="max-h-60 overflow-y-auto bg-slate-950 p-2 flex flex-col gap-1">
                         {searchRpzResults.map((res, i) => (
                           <div key={i} className="px-3 py-1.5 hover:bg-slate-800/50 rounded text-sm font-mono text-slate-300 flex justify-between items-center group">
                             <span>{res.split(' ')[0]}</span>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${res.includes('[WHITELISTED]') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                              {res.includes('[WHITELISTED]') ? 'WHITELISTED' : 'RPZ BLOCKED'}
+                              {res.includes('[WHITELISTED]') ? 'DIIZINKAN' : 'DIBLOKIR RPZ'}
                             </span>
                           </div>
                         ))}
@@ -887,10 +834,10 @@ function App() {
                     <div className="p-6 border-b border-slate-800">
                       <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
                         <Lock className="w-5 h-5 text-slate-400" />
-                        Query Access Control (ACL)
+                        Kontrol Akses Klien (ACL)
                       </h2>
                       <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                        Define authorized IP subnets (CIDR) permitted to utilize this DNS resolver. Unauthorized requests are hard-dropped.
+                        Tetapkan subnet IP (CIDR) yang diizinkan menggunakan DNS resolver ini. Permintaan tidak dikenal akan ditolak seketika (Drop).
                       </p>
                     </div>
                     
@@ -930,7 +877,7 @@ function App() {
                         onClick={saveACL}
                         className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
                       >
-                        Enforce ACL
+                        Terapkan ACL
                       </button>
                     </div>
                   </div>
@@ -941,10 +888,10 @@ function App() {
                   <div>
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
                       <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                      Custom Policy Exclusions
+                      Pengecualian Aturan Khusus
                     </h2>
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                      Explicitly Whitelist domains to bypass RPZ, or manually Blacklist domains to force block them. 
+                      Masukkan domain ke Daftar Diizinkan (Whitelist) untuk melewati blokir RPZ, atau masukkan ke Daftar Blokir (Blacklist) untuk memaksa pemblokiran. 
                     </p>
                   </div>
                   <button 
@@ -960,9 +907,9 @@ function App() {
                   {/* Whitelist Panel */}
                   <div className="flex-1 flex flex-col gap-4">
                      <label className="block text-sm font-bold text-emerald-400 tracking-widest uppercase flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" /> Global Whitelist
+                        <CheckCircle2 className="w-4 h-4" /> Daftar Diizinkan (Whitelist)
                      </label>
-                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Bypasses all RPZ and Master Feeds constraints.</p>
+                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Bebas dari semua blokir RPZ dan Master Feeds.</p>
                      
                      <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-2">
                         {customWhitelist.map((domain, i) => (
@@ -975,7 +922,7 @@ function App() {
                                     next[i] = e.target.value;
                                     setCustomWhitelist(next);
                                  }}
-                                 placeholder="e.g. valid-site.com"
+                                 placeholder="misal. situs-aman.com"
                                  className="flex-1 bg-transparent text-emerald-100 font-mono text-sm px-2 focus:outline-none placeholder:text-emerald-900/50"
                               />
                               <button onClick={() => setCustomWhitelist(customWhitelist.filter((_, idx)=>idx!==i))} className="text-emerald-700 hover:text-red-400 p-1">✕</button>
@@ -988,11 +935,11 @@ function App() {
                   </div>
 
                   {/* Blacklist Panel */}
-                  <div className="flex-1 flex flex-col gap-4 border-t lg:border-t-0 lg:border-l border-slate-800 pt-6 lg:pt-0 lg:pl-10">
-                     <label className="block text-sm font-bold text-red-400 tracking-widest uppercase flex items-center gap-2">
-                        <ShieldAlert className="w-4 h-4" /> Hard Blocklist
+                  <div className="flex-1 flex flex-col gap-4 border-t pt-6 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-10 border-slate-800">
+                     <label className="block text-sm font-bold text-red-500 tracking-widest uppercase flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4" /> Daftar Blokir (Blacklist)
                      </label>
-                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Force domains into the Laman Labuh RPZ gravity well.</p>
+                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Domain ini akan langsung diblokir secara mutlak.</p>
 
                      <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-2">
                         {customBlacklist.map((domain, i) => (
@@ -1025,59 +972,6 @@ function App() {
               {/* === TAB: GLOBAL FORWARDING === */}
               {adminTab === 'forwarding' && (
                 <>
-                  {/* Laman Labuh Config */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                    <div className="p-6 border-b border-slate-800">
-                      <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                        <Globe className="w-5 h-5 text-slate-400" />
-                        Regulatory Override (Laman Labuh)
-                      </h2>
-                      <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                        Set the target IP addresses for traffic intercepting blocked domains. Multiple IPs act as a load-balancing pool.
-                      </p>
-                    </div>
-                    
-                    <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                      <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
-                        {lamanLabuh.map((ip, i) => (
-                          <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
-                            <input
-                               type="text"
-                               value={ip}
-                               onChange={e => {
-                                   const next = [...lamanLabuh];
-                                   next[i] = e.target.value;
-                                   setLamanLabuh(next);
-                               }}
-                               className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
-                               placeholder="IP Address"
-                            />
-                            <button
-                               onClick={() => setLamanLabuh(lamanLabuh.filter((_, idx) => idx !== i))}
-                               className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
-                            >
-                               ✕
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                            onClick={() => setLamanLabuh([...lamanLabuh, ''])}
-                            className="mt-2 text-sm text-emerald-400 hover:text-emerald-300 flex items-center justify-center py-2.5 border border-dashed border-emerald-900/50 rounded-lg cursor-pointer transition-colors bg-emerald-950/10 hover:bg-emerald-950/30"
-                        >
-                            + Tambah IP Baru
-                        </button>
-                      </div>
-                    </div>
-                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
-                      <button 
-                        onClick={saveLamanLabuh}
-                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
-                      >
-                        Commit Configuration
-                      </button>
-                    </div>
-                  </div>
-
               {/* Kominfo Forwarders Config */}
               <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-2">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
@@ -1087,7 +981,7 @@ function App() {
                       Forwarder & Parent Resolver
                     </h2>
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                      Implement Conditional Forwarding policies matching the National Kominfo specifications.
+                      Implementasikan kebijakan Conditional Forwarding sesuai standar Nasional.
                     </p>
                   </div>
                   <button 
@@ -1154,9 +1048,9 @@ function App() {
                 <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3 pb-4 shadow-lg">
                   <div className="p-6 border-b border-slate-800">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                      <Server className="w-6 h-6 text-amber-500" /> Advanced DNS Operations
+                      <Server className="w-6 h-6 text-amber-500" /> Operasi DNS Lanjutan
                     </h2>
-                    <p className="text-slate-400 text-sm mt-3">Configure deep-level protocol behaviours including upstream cryptography and enforced traffic routing.</p>
+                    <p className="text-slate-400 text-sm mt-3">Konfigurasikan perilaku protokol tingkat-dalam (deep-layer), termasuk keamanan kriptografi huluan dan skenario perutean paksa.</p>
                   </div>
                   <div className="p-6 space-y-6 flex-1 bg-slate-950/30">
                     
@@ -1166,8 +1060,8 @@ function App() {
                         <input type="checkbox" id="safesearch" checked={safeSearch} onChange={(e) => setSafeSearch(e.target.checked)} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500" />
                       </div>
                       <div>
-                        <label htmlFor="safesearch" className="text-white font-semibold cursor-pointer text-base">Safesearch Enforce</label>
-                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Forced safesearch pada Google, Bing, Yandex, dan Duckduckgo via injected RPZ CNAME resolution.</p>
+                        <label htmlFor="safesearch" className="text-white font-semibold cursor-pointer text-base">Pemaksaan SafeSearch (Enforce)</label>
+                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Aktifkan pemaksaan (Forced) safesearch pada Google, Bing, Yandex, dan Duckduckgo via injeksi resolusi CNAME RPZ secara otomatis.</p>
                       </div>
                     </div>
 
@@ -1177,8 +1071,8 @@ function App() {
                         <input type="checkbox" id="tproxy" checked={tproxy} onChange={(e) => setTproxy(e.target.checked)} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900 cursor-pointer accent-emerald-500" />
                       </div>
                       <div>
-                        <label htmlFor="tproxy" className="text-white font-semibold cursor-pointer text-base">Tproxy Support (Transparent)</label>
-                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Accept Transparent DNS Server queries pada tcp/udp port 53. Server DNS kita otomatis melayani intersepsi NAT Firewall secara default.</p>
+                        <label htmlFor="tproxy" className="text-white font-semibold cursor-pointer text-base">Dukungan Tproxy (Transparan)</label>
+                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Menerima kueri Transparent DNS Server pada TCP/UDP port 53. Server DNS ini secara bawaan dapat melayani intersepsi lalu lintas dari NAT/Firewall (Mikrotik).</p>
                       </div>
                     </div>
 
@@ -1188,14 +1082,14 @@ function App() {
                         <input type="checkbox" id="dnssec" checked={dnssec} onChange={(e) => setDnssec(e.target.checked)} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-500 focus:ring-offset-slate-900 cursor-pointer accent-rose-500" />
                       </div>
                       <div>
-                        <label htmlFor="dnssec" className="text-white font-semibold cursor-pointer text-base">DNSSEC Validation</label>
-                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Enable strict cryptographic signature validation (BOGUS zones dropped). Peringatan: Akses diblokir seketika jika sertifikat domain kedaluwarsa.</p>
+                        <label htmlFor="dnssec" className="text-white font-semibold cursor-pointer text-base">Validasi Strict DNSSEC</label>
+                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Aktifkan validasi tanda tangan kriptografi tegar (zona BOGUS akan dibuang/drop). Peringatan: Akses diblokir seketika jika sertifikat otentikasi domain kedaluwarsa.</p>
                       </div>
                     </div>
                   </div>
                   <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end px-6">
                     <button onClick={saveAdvancedConfig} className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold tracking-wide rounded-lg shadow-[0_0_15px_rgba(217,119,6,0.3)] transition-colors cursor-pointer flex items-center gap-2">
-                       Apply Settings
+                       Terapkan Pengaturan
                     </button>
                   </div>
                 </div>
