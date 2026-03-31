@@ -12,7 +12,11 @@ RUN npm install && npm run build
 
 # Final Stage: PowerDNS + Supervisord Alpine base
 FROM alpine:latest
-RUN apk add --no-cache supervisor pdns-recursor lua sqlite tzdata
+RUN apk add --no-cache supervisor pdns-recursor lua sqlite tzdata bind-tools
+
+ENV TZ=Asia/Jakarta
+RUN cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
+    echo "Asia/Jakarta" > /etc/timezone
 
 # Copy built artifacts
 COPY --from=backend-builder /app/netshield-api /usr/local/bin/netshield-api

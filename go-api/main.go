@@ -110,6 +110,7 @@ func main() {
 
 	api.Get("/stats", GetPDNSStats)
     api.Get("/top-analytics", GetTopAnalytics)
+    api.Get("/check-domain", CheckDomainBlock)
 
 	// WebSocket handler
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -171,9 +172,21 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_feeds', 'https://trustpositif.kominfo.go.id/')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('domain_forwarders', 'kominfo.go.id,8.8.8.8,1.1.1.1')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('parent_resolvers', ',,,,,')`)
-	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1440')`)
+	db.Exec(`UPDATE settings SET value = '1440' WHERE key = 'rpz_sync_interval' AND value = '1'`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
 	db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.kominfo.go.id/","enabled":true}]' WHERE key = 'rpz_feeds' AND value NOT LIKE '[%'`)
+
+	// Inject new komdigi default if absent
+	var rpzValue string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_feeds'").Scan(&rpzValue)
+	if !strings.Contains(rpzValue, "trustpositif.komdigi.go.id/assets/db/domains") {
+		var feeds []RPZFeed
+		json.Unmarshal([]byte(rpzValue), &feeds)
+		feeds = append(feeds, RPZFeed{URL: "https://trustpositif.komdigi.go.id/assets/db/domains", Enabled: false})
+		newJSON, _ := json.Marshal(feeds)
+		db.Exec("UPDATE settings SET value = ? WHERE key = 'rpz_feeds'", string(newJSON))
+	}
 }
 
 func generateLuaConfig() {
@@ -606,4 +619,34 @@ func streamLogs() {
 			metricsMutex.Unlock()
 		}
 	}
+}
+
+func CheckDomainBlock(c *fiber.Ctx) error {
+	domain := c.Query("domain")
+	if domain == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "domain needed"})
+	}
+
+	var ipsStr string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipsStr)
+	lamanLabuhIPs := strings.Split(ipsStr, "\n")
+
+	cmd := exec.Command("dig", "@127.0.0.1", "-p", "53", "+short", domain)
+	out, _ := cmd.Output()
+	result := strings.TrimSpace(string(out))
+
+	isBlocked := false
+	for _, rawIP := range lamanLabuhIPs {
+		ip := strings.TrimSpace(rawIP)
+		if ip != "" && strings.Contains(result, ip) {
+			isBlocked = true
+			break
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"domain":     domain,
+		"is_blocked": isBlocked,
+		"resolve_to": result,
+	})
 }

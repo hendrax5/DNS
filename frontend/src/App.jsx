@@ -277,6 +277,53 @@ function App() {
               </div>
             </div>
 
+            {/* Domain Checker Widget */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex items-center justify-between gap-6">
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">
+                  <Globe className="w-4 h-4" /> Domain Diagnostics Checker
+                </h3>
+                <p className="text-xs text-slate-500">Ketahui secara instan apakah domain tertentu dibidik oleh RPZ/AXFR ISP/Kominfo.</p>
+              </div>
+              <div className="flex flex-1 items-center gap-3">
+                <input 
+                  type="text" 
+                  id="checkDomainInput"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') document.getElementById('btnCheckDomain').click()
+                  }}
+                  placeholder="e.g. reddit.com" 
+                  className="flex-1 bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500/50 shadow-inner"
+                />
+                <button 
+                  id="btnCheckDomain"
+                  onClick={async () => {
+                    const btn = document.getElementById('btnCheckDomain');
+                    const origText = btn.innerText;
+                    btn.innerText = 'Checking...';
+                    try {
+                      const domain = document.getElementById('checkDomainInput').value.trim();
+                      if(!domain) return;
+                      const res = await fetch('/api/check-domain?domain=' + encodeURIComponent(domain));
+                      const data = await res.json();
+                      if(data.is_blocked) {
+                        showNotification(`LOCKED: ${domain} dicekal! (Dialihkan ke: ${data.resolve_to})`, 'error');
+                      } else {
+                        showNotification(`ALLOW: ${domain} bersih dari blokir. (${data.resolve_to || 'NXDOMAIN'})`, 'success');
+                      }
+                    } catch (e) {
+                      showNotification('Gagal menghubungi Engine DNS', 'error');
+                    } finally {
+                      btn.innerText = origText;
+                    }
+                  }}
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white rounded-lg transition-colors shadow-[0_0_15px_rgba(79,70,229,0.3)] whitespace-nowrap cursor-pointer"
+                >
+                  Verify Domain
+                </button>
+              </div>
+            </div>
+
             {/* Charts & Intel */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Traffic Chart */}
