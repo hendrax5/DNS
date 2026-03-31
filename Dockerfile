@@ -29,7 +29,7 @@ COPY pdns_config/ /etc/powerdns/
 # Setup directories
 RUN mkdir -p /var/run/pdns-recursor /var/log/supervisor /data && \
     chown recursor:recursor /var/run/pdns-recursor && \
-    touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua
+    touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua /etc/powerdns/rpz_feeds.txt /etc/powerdns/allowed_ips.txt /etc/powerdns/rpz_compiled.zone
 
 # Expose ports
 EXPOSE 53/udp 53/tcp 80/tcp

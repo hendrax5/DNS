@@ -208,7 +208,7 @@ func generateLuaConfig() {
 		json.Unmarshal([]byte(axfrValue), &axfrFeeds)
 	}
 
-	luaContent := fmt.Sprintf(`rpzFile("/etc/powerdns/rpz_feeds.txt", {defpol=Policy.Custom, defcontent="%s"})`+"\n", lamanLabuhIP)
+	luaContent := fmt.Sprintf(`rpzFile("/etc/powerdns/rpz_compiled.zone", {defpol=Policy.Custom, defcontent="%s"})`+"\n", lamanLabuhIP)
 
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
@@ -473,7 +473,15 @@ func syncRPZWorker() {
 			var feeds []RPZFeed
 			json.Unmarshal([]byte(value), &feeds)
 			var newStatuses []FeedStatus
-
+			
+			// Start compiling new Master Zone File
+			compiledLines := []string{
+				"$TTL 60",
+				"@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H",
+				"@ IN NS localhost.",
+				"",
+			}
+			
 			for _, f := range feeds {
 				u := strings.TrimSpace(f.URL)
 				if u == "" {
@@ -503,13 +511,20 @@ func syncRPZWorker() {
 					body, _ := ioutil.ReadAll(resp.Body)
 					resp.Body.Close()
 					
-					// Hitung baris valid
 					lines := strings.Split(string(body), "\n")
 					validCount := 0
 					for _, line := range lines {
 						line = strings.TrimSpace(line)
 						if line != "" && !strings.HasPrefix(line, "#") {
-							validCount++
+							// Basic sanitize: Remove http/https if wrongly formatted in feed
+							line = strings.ReplaceAll(line, "http://", "")
+							line = strings.ReplaceAll(line, "https://", "")
+							line = strings.Split(line, "/")[0]
+							// Ensure only valid domains are appended
+							if !strings.Contains(line, " ") {
+								validCount++
+								compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME .", line))
+							}
 						}
 					}
 
@@ -537,6 +552,13 @@ func syncRPZWorker() {
 			feedMutex.Lock()
 			feedStatuses = newStatuses
 			feedMutex.Unlock()
+
+			// Write Compiled RPZ Zone Master to disk
+			errWrite := ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte(strings.Join(compiledLines, "\n")), 0644)
+			if errWrite == nil {
+				// Signal PowerDNS to instantly reload latest compiled policies
+				exec.Command("rec_control", "reload-lua-config").Run()
+			}
 		}
 		
 		var intervalStr string
