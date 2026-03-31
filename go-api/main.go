@@ -263,10 +263,11 @@ func SaveACL(c *fiber.Ctx) error {
 
 func GetPDNSStats(c *fiber.Ctx) error {
 	feedMutex.RLock()
-	currentStatus := feedStatuses
+	currentStatus := make([]FeedStatus, len(feedStatuses))
+	copy(currentStatus, feedStatuses)
 	feedMutex.RUnlock()
 
-	// Jika belum ada data dari worker, kirim array kosong bukan nil
+	// Fallback empty array
 	if currentStatus == nil {
 		currentStatus = []FeedStatus{}
 	}
