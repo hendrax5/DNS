@@ -37,6 +37,12 @@ function gettag(remote, ednsmask, localmac, qname, qtype, ednsoptions, tcp)
 end
 
 function preresolve(dq)
+    -- Enforce ACL Drop (Return REFUSED)
+    if not acl:match(dq.remoteaddr) then
+        dq.rcode = pdns.REFUSED
+        return true
+    end
+
     if dq.appliedPolicy and dq.appliedPolicy.policyKind ~= pdns.policykinds.NoAction then
         if logfile then
             logfile:write(string.format('{"time":%d, "ip":"%s", "qname":"%s", "type":%d, "action":"DROP_RPZ"}\n', os.time(), dq.remoteaddr:toString(), dq.qname:toString(), dq.qtype))
