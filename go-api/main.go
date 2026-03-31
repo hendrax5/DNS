@@ -479,6 +479,7 @@ func syncRPZWorker() {
 			
 			// Start compiling new Master Zone File
 			compiledLines := []string{
+				"$ORIGIN .",
 				"$TTL 60",
 				"@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H",
 				"@ IN NS localhost.",
