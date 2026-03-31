@@ -1,0 +1,5 @@
+.git
+.dockerignore
+frontend/node_modules
+frontend/dist
+go-api/netshield-api
