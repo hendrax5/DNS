@@ -16,6 +16,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [adminTab, setAdminTab] = useState('threats');
   const [stats, setStats] = useState(null);
   const [lamanLabuh, setLamanLabuh] = useState([]);
   const [aclList, setAclList] = useState([]);
@@ -474,14 +475,24 @@ function App() {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 flex flex-col h-full">
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">Security Policies</h1>
               <p className="text-slate-400 text-sm mt-1">Manage network access and regulatory compliance routing.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Laman Labuh Config */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-4">
+              <button onClick={() => setAdminTab('threats')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'threats' ? 'bg-fuchsia-600 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldAlert className="w-4 h-4 inline-block mr-2" />Threat Intel & RPZ</button>
+              <button onClick={() => setAdminTab('forwarding')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'forwarding' ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />Global Forwarding</button>
+              <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Access Control</button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              
+              {/* === TAB: THREATS === */}
+              {adminTab === 'threats' && (
+                <>
+                  {/* RPZ Feeds Config */}
               <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-slate-800">
                   <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
@@ -587,7 +598,83 @@ function App() {
                 </div>
               </div>
 
-              {/* RPZ Feeds Config */}
+                  {/* AXFR Native Zone Config */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+                    <div className="p-6 border-b border-slate-800">
+                      <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                        <DatabaseIcon className="w-5 h-5 text-indigo-400" />
+                        AXFR/IXFR DNS Masters
+                      </h2>
+                      <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                        Native Protocol Zone Transfer directly to BSSN/Kominfo servers (bypasses HTTP syncs).
+                      </p>
+                    </div>
+                    
+                    <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
+                      <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
+                        {rpzAXFR.map((feed, i) => (
+                          <div key={i} className="flex flex-col gap-2 bg-[#0b1120] p-4 rounded-lg border border-slate-800/80 shadow-inner">
+                            <div className="flex items-center gap-3">
+                               <input
+                                  type="text"
+                                  value={feed.master_ip}
+                                  onChange={e => {
+                                      const next = [...rpzAXFR];
+                                      next[i].master_ip = e.target.value;
+                                      setRpzAXFR(next);
+                                  }}
+                                  className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
+                                  placeholder="IP Master (e.g. 182.23.79.202)"
+                               />
+                               <input
+                                  type="text"
+                                  value={feed.zone_name}
+                                  onChange={e => {
+                                      const next = [...rpzAXFR];
+                                      next[i].zone_name = e.target.value;
+                                      setRpzAXFR(next);
+                                  }}
+                                  className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
+                                  placeholder="Zone (e.g. trustpositifkominfo)"
+                               />
+                            </div>
+                            <div className="flex justify-between items-center mt-2">
+                               <button
+                                  onClick={() => {
+                                      const next = [...rpzAXFR];
+                                      next[i].enabled = !next[i].enabled;
+                                      setRpzAXFR(next);
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-[0_0_10px_rgba(79,70,229,0.15)]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
+                               >
+                                  {feed.enabled ? 'PROTOCOL ENABLED' : 'DISABLED'}
+                               </button>
+                               <button
+                                  onClick={() => setRpzAXFR(rpzAXFR.filter((_, idx) => idx !== i))}
+                                  className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer text-xs"
+                               >
+                                  ✕ Buang
+                               </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                            onClick={() => setRpzAXFR([...rpzAXFR, {master_ip: '', zone_name: '', enabled: false}])}
+                            className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 flex items-center justify-center py-2.5 border border-dashed border-indigo-900/50 rounded-lg cursor-pointer transition-colors bg-indigo-950/10 hover:bg-indigo-950/30"
+                        >
+                            + Tambah Master AXFR Server
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+                      <button 
+                        onClick={saveAXFR}
+                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
+                      >
+                        Deploy AXFR Rules
+                      </button>
+                    </div>
+                  </div>
               <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-slate-800">
                   <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
@@ -738,9 +825,67 @@ function App() {
                   )}
                 </div>
               </div>
+              </>
+              )}
+
+              {/* === TAB: ACCESS CONTROL === */}
+              {adminTab === 'access' && (
+                <>
+                  {/* ACL Config */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+                    <div className="p-6 border-b border-slate-800">
+                      <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                        <Lock className="w-5 h-5 text-slate-400" />
+                        Query Access Control (ACL)
+                      </h2>
+                      <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                        Define authorized IP subnets (CIDR) permitted to utilize this DNS resolver. Unauthorized requests are hard-dropped.
+                      </p>
+                    </div>
+                    
+                    <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
+                      <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
+                        {aclList.map((acl, i) => (
+                          <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
+                            <input
+                               type="text"
+                               value={acl}
+                               onChange={e => {
+                                   const next = [...aclList];
+                                   next[i] = e.target.value;
+                                   setAclList(next);
+                               }}
+                               className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
+                               placeholder="CIDR (e.g. 192.168.1.0/24)"
+                            />
+                            <button
+                               onClick={() => setAclList(aclList.filter((_, idx) => idx !== i))}
+                               className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
+                            >
+                               ✕
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                            onClick={() => setAclList([...aclList, ''])}
+                            className="mt-2 text-sm text-emerald-400 hover:text-emerald-300 flex items-center justify-center py-2.5 border border-dashed border-emerald-900/50 rounded-lg cursor-pointer transition-colors bg-emerald-950/10 hover:bg-emerald-950/30"
+                        >
+                            + Tambah Subnet Baru
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+                      <button 
+                        onClick={saveACL}
+                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
+                      >
+                        Enforce ACL
+                      </button>
+                    </div>
+                  </div>
 
               {/* Custom Whitelist & Blacklist Arrays */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-2">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
                   <div>
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
@@ -823,87 +968,67 @@ function App() {
 
                 </div>
               </div>
+              </>
+              )}
 
-              {/* AXFR Native Zone Config */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                <div className="p-6 border-b border-slate-800">
-                  <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                    <DatabaseIcon className="w-5 h-5 text-indigo-400" />
-                    AXFR/IXFR DNS Masters
-                  </h2>
-                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                    Native Protocol Zone Transfer directly to BSSN/Kominfo servers (bypasses HTTP syncs).
-                  </p>
-                </div>
-                
-                <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
-                    {rpzAXFR.map((feed, i) => (
-                      <div key={i} className="flex flex-col gap-2 bg-[#0b1120] p-4 rounded-lg border border-slate-800/80 shadow-inner">
-                        <div className="flex items-center gap-3">
-                           <input
-                              type="text"
-                              value={feed.master_ip}
-                              onChange={e => {
-                                  const next = [...rpzAXFR];
-                                  next[i].master_ip = e.target.value;
-                                  setRpzAXFR(next);
-                              }}
-                              className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
-                              placeholder="IP Master (e.g. 182.23.79.202)"
-                           />
-                           <input
-                              type="text"
-                              value={feed.zone_name}
-                              onChange={e => {
-                                  const next = [...rpzAXFR];
-                                  next[i].zone_name = e.target.value;
-                                  setRpzAXFR(next);
-                              }}
-                              className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
-                              placeholder="Zone (e.g. trustpositifkominfo)"
-                           />
-                        </div>
-                        <div className="flex justify-between items-center mt-2">
-                           <button
-                              onClick={() => {
-                                  const next = [...rpzAXFR];
-                                  next[i].enabled = !next[i].enabled;
-                                  setRpzAXFR(next);
-                              }}
-                              className={`px-3 py-1 rounded text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-[0_0_10px_rgba(79,70,229,0.15)]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
-                           >
-                              {feed.enabled ? 'PROTOCOL ENABLED' : 'DISABLED'}
-                           </button>
-                           <button
-                              onClick={() => setRpzAXFR(rpzAXFR.filter((_, idx) => idx !== i))}
-                              className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer text-xs"
-                           >
-                              ✕ Buang
-                           </button>
-                        </div>
+              {/* === TAB: GLOBAL FORWARDING === */}
+              {adminTab === 'forwarding' && (
+                <>
+                  {/* Laman Labuh Config */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+                    <div className="p-6 border-b border-slate-800">
+                      <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                        <Globe className="w-5 h-5 text-slate-400" />
+                        Regulatory Override (Laman Labuh)
+                      </h2>
+                      <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                        Set the target IP addresses for traffic intercepting blocked domains. Multiple IPs act as a load-balancing pool.
+                      </p>
+                    </div>
+                    
+                    <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
+                      <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
+                        {lamanLabuh.map((ip, i) => (
+                          <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
+                            <input
+                               type="text"
+                               value={ip}
+                               onChange={e => {
+                                   const next = [...lamanLabuh];
+                                   next[i] = e.target.value;
+                                   setLamanLabuh(next);
+                               }}
+                               className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
+                               placeholder="IP Address"
+                            />
+                            <button
+                               onClick={() => setLamanLabuh(lamanLabuh.filter((_, idx) => idx !== i))}
+                               className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
+                            >
+                               ✕
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                            onClick={() => setLamanLabuh([...lamanLabuh, ''])}
+                            className="mt-2 text-sm text-emerald-400 hover:text-emerald-300 flex items-center justify-center py-2.5 border border-dashed border-emerald-900/50 rounded-lg cursor-pointer transition-colors bg-emerald-950/10 hover:bg-emerald-950/30"
+                        >
+                            + Tambah IP Baru
+                        </button>
                       </div>
-                    ))}
-                    <button
-                        onClick={() => setRpzAXFR([...rpzAXFR, {master_ip: '', zone_name: '', enabled: false}])}
-                        className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 flex items-center justify-center py-2.5 border border-dashed border-indigo-900/50 rounded-lg cursor-pointer transition-colors bg-indigo-950/10 hover:bg-indigo-950/30"
-                    >
-                        + Tambah Master AXFR Server
-                    </button>
+                    </div>
+                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+                      <button 
+                        onClick={saveLamanLabuh}
+                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
+                      >
+                        Commit Configuration
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
-                  <button 
-                    onClick={saveAXFR}
-                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
-                  >
-                    Deploy AXFR Rules
-                  </button>
-                </div>
-              </div>
 
               {/* Kominfo Forwarders Config */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-2">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
                   <div>
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
@@ -970,6 +1095,8 @@ function App() {
 
                 </div>
               </div>
+              </>
+              )}
 
             </div>
           </div>

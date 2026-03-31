@@ -204,14 +204,6 @@ func initDB() {
 }
 
 func generateLuaConfig() {
-	var ipsStr string
-	db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipsStr)
-	ips := strings.Split(ipsStr, "\n")
-	lamanLabuhIP := "139.255.196.196"
-	if len(ips) > 0 && ips[0] != "" {
-		lamanLabuhIP = ips[0]
-	}
-
 	var axfrValue string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_axfr_feeds'").Scan(&axfrValue)
 	var axfrFeeds []RPZAXFRFeed
@@ -219,11 +211,11 @@ func generateLuaConfig() {
 		json.Unmarshal([]byte(axfrValue), &axfrFeeds)
 	}
 
-	luaContent := fmt.Sprintf(`rpzFile("/etc/powerdns/rpz_compiled.zone", {defpol=Policy.Custom, defcontent="%s"})`+"\n", lamanLabuhIP)
+	luaContent := `rpzFile("/etc/powerdns/rpz_compiled.zone")` + "\n"
 
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
-			luaContent += fmt.Sprintf(`rpzMaster("%s", "%s", {defpol=Policy.Custom, defcontent="%s"})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP)
+			luaContent += fmt.Sprintf(`rpzMaster("%s", "%s")`+"\n", f.MasterIP, f.ZoneName)
 		}
 	}
 
@@ -492,6 +484,17 @@ func syncRPZWorker() {
 				"@ IN NS localhost.",
 				"",
 			}
+			
+			// Load Laman Labuh Action
+			var ipListStr string
+			db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipListStr)
+			blockAction := "CNAME ."
+			for _, ip := range strings.Split(ipListStr, "\n") {
+				if ip = strings.TrimSpace(ip); ip != "" {
+					blockAction = "A " + ip
+					break
+				}
+			}
 
 			// Load custom whitelist to override blacklist/RPZ
 			var wlStr string
@@ -508,7 +511,7 @@ func syncRPZWorker() {
 			for _, d := range strings.Split(blStr, "\n") {
 				d = strings.TrimSpace(d)
 				if d != "" && !wlMap[d] {
-					compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME .", d))
+					compiledLines = append(compiledLines, fmt.Sprintf("%s %s", d, blockAction))
 				}
 			}
 			
@@ -565,7 +568,7 @@ func syncRPZWorker() {
 							// Ensure not whitelisted
 							if !wlMap[domain] {
 								validCount++
-								compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME .", domain))
+								compiledLines = append(compiledLines, fmt.Sprintf("%s %s", domain, blockAction))
 							}
 						}
 					}
