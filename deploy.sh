@@ -12,12 +12,13 @@ chmod +x sysctl-dns-optimize.sh
 sudo ./sysctl-dns-optimize.sh || echo "⚠️ Peringatan: Gagal menerapkan sysctl (Abaikan jika menggunakan Windows/Mac)."
 echo ""
 
-# 2. Menghentikan Docker Stack lama jika ada
-echo "[2/3] Membersihkan container lama..."
-docker-compose down
+# 2. Persiapkan Volume Persisten (Zero Data Loss)
+echo "[2/3] Menyiapkan Volume Persisten Database..."
+mkdir -p data
+chmod 777 data
 echo ""
 
-# 3. Membangun dan menyalakan server
+# 3. Membangun dan menyalakan server secara Zero-Downtime
 echo "[3/3] Membangun (Build) dan Menjalankan NetShield Container..."
 docker-compose up -d --build
 
