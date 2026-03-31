@@ -201,9 +201,18 @@ func initDB() {
 		newJSON, _ := json.Marshal(feeds)
 		db.Exec("UPDATE settings SET value = ? WHERE key = 'rpz_feeds'", string(newJSON))
 	}
+
+	// ALWAYS securely regenerate PowerDNS Lua mappings on Startup!
+	log.Println("Regenerating PowerDNS Lua mappings based on DB State...")
+	generateLuaConfig()
 }
 
 func generateLuaConfig() {
+	// Pastikan file zona ada sebelum PowerDNS mencoba me-reload LUA
+	if _, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); os.IsNotExist(err) {
+		ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte("$ORIGIN rpz.local.\n$TTL 60\n@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H\n@ IN NS localhost.\n\n"), 0644)
+	}
+
 	var axfrValue string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_axfr_feeds'").Scan(&axfrValue)
 	var axfrFeeds []RPZAXFRFeed
@@ -475,6 +484,12 @@ func syncRPZWorker() {
 		if err == nil && value != "" {
 			var feeds []RPZFeed
 			json.Unmarshal([]byte(value), &feeds)
+
+			// Pastikan file zona selalu ada saat startup untuk PowerDNS
+			if _, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); os.IsNotExist(err) {
+				ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte("$ORIGIN rpz.local.\n$TTL 60\n@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H\n@ IN NS localhost.\n\n"), 0644)
+			}
+
 			var newStatuses []FeedStatus
 			
 			// Start compiling new Master Zone File
