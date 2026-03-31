@@ -17,8 +17,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState(null);
-  const [lamanLabuh, setLamanLabuh] = useState('');
-  const [aclList, setAclList] = useState('');
+  const [lamanLabuh, setLamanLabuh] = useState([]);
+  const [aclList, setAclList] = useState([]);
   const [rpzFeeds, setRpzFeeds] = useState([]);
   const [rpzAXFR, setRpzAXFR] = useState([]);
   const [syncInterval, setSyncInterval] = useState(1);
@@ -80,11 +80,11 @@ function App() {
     try {
       const resLL = await fetch('/api/laman-labuh');
       const dataLL = await resLL.json();
-      if(dataLL.ips) setLamanLabuh(dataLL.ips.join('\n'));
+      if(dataLL.ips) setLamanLabuh(dataLL.ips.filter(Boolean));
 
       const resACL = await fetch('/api/acl');
       const dataACL = await resACL.json();
-      if(dataACL.ips) setAclList(dataACL.ips.join('\n'));
+      if(dataACL.ips) setAclList(dataACL.ips.filter(Boolean));
 
       const resRPZ = await fetch('/api/rpz-feeds');
       const dataRPZ = await resRPZ.json();
@@ -113,7 +113,7 @@ function App() {
 
   const saveLamanLabuh = async () => {
     try {
-      const ips = lamanLabuh.split('\n').map(i=>i.trim()).filter(i=>i);
+      const ips = lamanLabuh.map(i=>i.trim()).filter(i=>i);
       await fetch('/api/laman-labuh', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -125,7 +125,7 @@ function App() {
 
   const saveACL = async () => {
     try {
-      const ips = aclList.split('\n').map(i=>i.trim()).filter(i=>i);
+      const ips = aclList.map(i=>i.trim()).filter(i=>i);
       await fetch('/api/acl', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -407,13 +407,35 @@ function App() {
                 </div>
                 
                 <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Target IPs (One per line)</label>
-                  <textarea 
-                    value={lamanLabuh}
-                    onChange={e => setLamanLabuh(e.target.value)}
-                    className="w-full flex-1 min-h-[200px] bg-slate-950 border border-slate-800 rounded-lg p-4 text-slate-300 font-mono text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all resize-none"
-                    placeholder="139.255.196.196&#10;103.154.123.132"
-                  />
+                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
+                    {lamanLabuh.map((ip, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
+                        <input
+                           type="text"
+                           value={ip}
+                           onChange={e => {
+                               const next = [...lamanLabuh];
+                               next[i] = e.target.value;
+                               setLamanLabuh(next);
+                           }}
+                           className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
+                           placeholder="IP Address"
+                        />
+                        <button
+                           onClick={() => setLamanLabuh(lamanLabuh.filter((_, idx) => idx !== i))}
+                           className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
+                        >
+                           ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                        onClick={() => setLamanLabuh([...lamanLabuh, ''])}
+                        className="mt-2 text-sm text-emerald-400 hover:text-emerald-300 flex items-center justify-center py-2.5 border border-dashed border-emerald-900/50 rounded-lg cursor-pointer transition-colors bg-emerald-950/10 hover:bg-emerald-950/30"
+                    >
+                        + Tambah IP Baru
+                    </button>
+                  </div>
                 </div>
                 <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
                   <button 
@@ -438,13 +460,35 @@ function App() {
                 </div>
                 
                 <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Allowed Subnets (CIDR)</label>
-                  <textarea 
-                    value={aclList}
-                    onChange={e => setAclList(e.target.value)}
-                    className="w-full flex-1 min-h-[200px] bg-slate-950 border border-slate-800 rounded-lg p-4 text-slate-300 font-mono text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all resize-none"
-                    placeholder="10.0.0.0/8&#10;192.168.0.0/16"
-                  />
+                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
+                    {aclList.map((acl, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner">
+                        <input
+                           type="text"
+                           value={acl}
+                           onChange={e => {
+                               const next = [...aclList];
+                               next[i] = e.target.value;
+                               setAclList(next);
+                           }}
+                           className="flex-1 bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
+                           placeholder="CIDR (e.g. 192.168.1.0/24)"
+                        />
+                        <button
+                           onClick={() => setAclList(aclList.filter((_, idx) => idx !== i))}
+                           className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
+                        >
+                           ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                        onClick={() => setAclList([...aclList, ''])}
+                        className="mt-2 text-sm text-emerald-400 hover:text-emerald-300 flex items-center justify-center py-2.5 border border-dashed border-emerald-900/50 rounded-lg cursor-pointer transition-colors bg-emerald-950/10 hover:bg-emerald-950/30"
+                    >
+                        + Tambah Subnet Baru
+                    </button>
+                  </div>
                 </div>
                 <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
                   <button 
