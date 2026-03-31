@@ -10,7 +10,9 @@ import {
   BarChart2, 
   ShieldAlert,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Cpu,
+  HardDrive
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -284,7 +286,7 @@ function App() {
             </div>
 
             {/* Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-slate-400 font-medium text-sm">Queries / Second</h3>
@@ -292,14 +294,14 @@ function App() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.qps.toLocaleString() : '...'}</span>
-                  <span className="text-xs text-emerald-400 font-medium">+2.4%</span>
+                  <span className="text-xs text-emerald-400 font-medium">Live</span>
                 </div>
               </div>
               
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-slate-400 font-medium text-sm">Cache Hit Ratio</h3>
-                  <DatabaseIcon className="w-5 h-5 text-emerald-500" />
+                  <Server className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.cache_hit_ratio : '...'}%</span>
@@ -310,12 +312,36 @@ function App() {
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-slate-400 font-medium text-sm">Recursive Latency</h3>
-                  <Server className="w-5 h-5 text-slate-400" />
+                  <Globe className="w-5 h-5 text-slate-400" />
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.avg_latency_ms : '...'} <span className="text-lg text-slate-500">ms</span></span>
+                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.avg_latency_ms : '...'}</span>
+                  <span className="text-lg text-slate-500 ml-1">ms</span>
                 </div>
               </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-slate-400 font-medium text-sm">CPU Usage</h3>
+                  <Cpu className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.cpu_usage : '...'}%</span>
+                  <span className="text-xs text-emerald-400 font-medium">Stable</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-slate-400 font-medium text-sm">Real Memory</h3>
+                  <HardDrive className="w-5 h-5 text-purple-500" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.mem_usage_mb : '...'}</span>
+                  <span className="text-lg text-slate-500 ml-1">MB</span>
+                </div>
+              </div>
+
             </div>
 
             {/* Domain Checker Widget */}

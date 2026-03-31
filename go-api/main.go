@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -321,13 +322,46 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		}
 	}
 
+	var qps, latency, cpu, mem, uptime float64
+	var hitRatio float64 = 0
+
+	out, err := exec.Command("rec_control", "get-all").Output()
+	if err == nil {
+		lines := strings.Split(string(out), "\n")
+		metrics := make(map[string]float64)
+		for _, line := range lines {
+			parts := strings.Fields(line)
+			if len(parts) == 2 {
+				val, _ := strconv.ParseFloat(parts[1], 64)
+				metrics[parts[0]] = val
+			}
+		}
+
+		hits := metrics["cache-hits"]
+		misses := metrics["cache-misses"]
+		if hits+misses > 0 {
+			hitRatio = (hits / (hits + misses)) * 100
+		}
+		
+		uptime = metrics["uptime"]
+		if uptime > 0 {
+			qps = metrics["questions"] / uptime
+			cpu = (metrics["user-msec"] + metrics["sys-msec"]) / 10.0 / uptime
+		}
+
+		latency = metrics["qa-latency"] / 1000.0 // ns or us to ms usually
+		mem = metrics["real-memory-usage"] / 1024.0 / 1024.0 // bytes to MB
+	} else {
+		qps, hitRatio, latency, cpu, mem, uptime = 0, 0, 0, 0, 0, 0
+	}
+
 	return c.JSON(fiber.Map{
-		"qps":             125432,
-		"cache_hit_ratio": 94.2,
-		"avg_latency_ms":  42.3,
-		"cpu_usage":       23,
-		"mem_usage_mb":    4200,
-		"uptime_seconds":  1234567,
+		"qps":             math.Round(qps),
+		"cache_hit_ratio": math.Round(hitRatio*10) / 10,
+		"avg_latency_ms":  math.Round(latency*10) / 10,
+		"cpu_usage":       math.Round(cpu*10) / 10,
+		"mem_usage_mb":    math.Round(mem),
+		"uptime_seconds":  int(uptime),
 		"rpz_status":      currentStatus,
 	})
 }
