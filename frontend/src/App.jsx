@@ -20,6 +20,7 @@ function App() {
   const [lamanLabuh, setLamanLabuh] = useState('');
   const [aclList, setAclList] = useState('');
   const [rpzFeeds, setRpzFeeds] = useState([]);
+  const [rpzAXFR, setRpzAXFR] = useState([]);
   const [syncInterval, setSyncInterval] = useState(1);
   const [domainForwarders, setDomainForwarders] = useState('');
   const [parentResolvers, setParentResolvers] = useState(['', '', '', '', '', '']);
@@ -90,6 +91,10 @@ function App() {
       if(dataRPZ.feeds) setRpzFeeds(dataRPZ.feeds);
       if(dataRPZ.sync_interval) setSyncInterval(dataRPZ.sync_interval);
 
+      const resAXFR = await fetch('/api/rpz-axfr');
+      const dataAXFR = await resAXFR.json();
+      if(dataAXFR.feeds) setRpzAXFR(dataAXFR.feeds);
+
       const resFwd = await fetch('/api/forwarders');
       const dataFwd = await resFwd.json();
       if(dataFwd.domain_forwarders !== undefined) setDomainForwarders(dataFwd.domain_forwarders);
@@ -139,6 +144,17 @@ function App() {
       });
       showNotification('RPZ Feeds scheduled for sync');
     } catch(e) { showNotification('Failed to update RPZ', 'error'); }
+  };
+
+  const saveAXFR = async () => {
+    try {
+      await fetch('/api/rpz-axfr', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ feeds: rpzAXFR.filter(f => f.master_ip.trim() && f.zone_name.trim()) })
+      });
+      showNotification('Native Zone IXFR Configured Successfully');
+    } catch(e) { showNotification('Failed to update AXFR Masters', 'error'); }
   };
 
   const saveForwarders = async () => {
@@ -513,6 +529,84 @@ function App() {
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
                   >
                     Save & Sync Feeds
+                  </button>
+                </div>
+              </div>
+
+              {/* AXFR Native Zone Config */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+                <div className="p-6 border-b border-slate-800">
+                  <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                    <DatabaseIcon className="w-5 h-5 text-indigo-400" />
+                    AXFR/IXFR DNS Masters
+                  </h2>
+                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                    Native Protocol Zone Transfer directly to BSSN/Kominfo servers (bypasses HTTP syncs).
+                  </p>
+                </div>
+                
+                <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
+                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
+                    {rpzAXFR.map((feed, i) => (
+                      <div key={i} className="flex flex-col gap-2 bg-[#0b1120] p-4 rounded-lg border border-slate-800/80 shadow-inner">
+                        <div className="flex items-center gap-3">
+                           <input
+                              type="text"
+                              value={feed.master_ip}
+                              onChange={e => {
+                                  const next = [...rpzAXFR];
+                                  next[i].master_ip = e.target.value;
+                                  setRpzAXFR(next);
+                              }}
+                              className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
+                              placeholder="IP Master (e.g. 182.23.79.202)"
+                           />
+                           <input
+                              type="text"
+                              value={feed.zone_name}
+                              onChange={e => {
+                                  const next = [...rpzAXFR];
+                                  next[i].zone_name = e.target.value;
+                                  setRpzAXFR(next);
+                              }}
+                              className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
+                              placeholder="Zone (e.g. trustpositifkominfo)"
+                           />
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                           <button
+                              onClick={() => {
+                                  const next = [...rpzAXFR];
+                                  next[i].enabled = !next[i].enabled;
+                                  setRpzAXFR(next);
+                              }}
+                              className={`px-3 py-1 rounded text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-[0_0_10px_rgba(79,70,229,0.15)]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
+                           >
+                              {feed.enabled ? 'PROTOCOL ENABLED' : 'DISABLED'}
+                           </button>
+                           <button
+                              onClick={() => setRpzAXFR(rpzAXFR.filter((_, idx) => idx !== i))}
+                              className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer text-xs"
+                           >
+                              ✕ Buang
+                           </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                        onClick={() => setRpzAXFR([...rpzAXFR, {master_ip: '', zone_name: '', enabled: false}])}
+                        className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 flex items-center justify-center py-2.5 border border-dashed border-indigo-900/50 rounded-lg cursor-pointer transition-colors bg-indigo-950/10 hover:bg-indigo-950/30"
+                    >
+                        + Tambah Master AXFR Server
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+                  <button 
+                    onClick={saveAXFR}
+                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
+                  >
+                    Deploy AXFR Rules
                   </button>
                 </div>
               </div>

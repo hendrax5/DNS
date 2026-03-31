@@ -43,6 +43,16 @@ type RPZRequest struct {
 	SyncInterval int       `json:"sync_interval"`
 }
 
+type RPZAXFRFeed struct {
+	MasterIP string `json:"master_ip"`
+	ZoneName string `json:"zone_name"`
+	Enabled  bool   `json:"enabled"`
+}
+
+type RPZAXFRRequest struct {
+	Feeds []RPZAXFRFeed `json:"feeds"`
+}
+
 type ForwarderRequest struct {
 	DomainForwarders string   `json:"domain_forwarders"`
 	ParentResolvers  []string `json:"parent_resolvers"`
@@ -91,6 +101,9 @@ func main() {
 
 	api.Get("/rpz-feeds", GetRPZFeeds)
 	api.Post("/rpz-feeds", SaveRPZFeeds)
+
+	api.Get("/rpz-axfr", GetRPZAXFRFeeds)
+	api.Post("/rpz-axfr", SaveRPZAXFRFeeds)
 
 	api.Get("/forwarders", GetForwarders)
 	api.Post("/forwarders", SaveForwarders)
@@ -159,7 +172,36 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('domain_forwarders', 'kominfo.go.id,8.8.8.8,1.1.1.1')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('parent_resolvers', ',,,,,')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
 	db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.kominfo.go.id/","enabled":true}]' WHERE key = 'rpz_feeds' AND value NOT LIKE '[%'`)
+}
+
+func generateLuaConfig() {
+	var ipsStr string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipsStr)
+	ips := strings.Split(ipsStr, "\n")
+	lamanLabuhIP := "139.255.196.196"
+	if len(ips) > 0 && ips[0] != "" {
+		lamanLabuhIP = ips[0]
+	}
+
+	var axfrValue string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_axfr_feeds'").Scan(&axfrValue)
+	var axfrFeeds []RPZAXFRFeed
+	if axfrValue != "" {
+		json.Unmarshal([]byte(axfrValue), &axfrFeeds)
+	}
+
+	luaContent := fmt.Sprintf(`rpzFile("/etc/powerdns/rpz_feeds.txt", {defpol=Policy.Custom, defcontent="%s"})`+"\n", lamanLabuhIP)
+
+	for _, f := range axfrFeeds {
+		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
+			luaContent += fmt.Sprintf(`rpzMaster("%s", "%s", {defpol=Policy.Custom, defcontent="%s"})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP)
+		}
+	}
+
+	ioutil.WriteFile("/etc/powerdns/laman_labuh.lua", []byte(luaContent), 0644)
+	exec.Command("rec_control", "reload-lua-config").Run()
 }
 
 func GetLamanLabuh(c *fiber.Ctx) error {
@@ -177,19 +219,13 @@ func SaveLamanLabuh(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	ipsStr := strings.Join(req.IPs, ",")
+	ipsStr := strings.Join(req.IPs, "\n")
 	_, err := db.Exec("UPDATE settings SET value = ? WHERE key = 'laman_labuh_ip'", ipsStr)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	luaContent := fmt.Sprintf(`rpzFile("/etc/powerdns/trustpositif.rpz", {defpol=Policy.Custom, defcontent={"%s"}})`, strings.Join(req.IPs, `", "`))
-	err = ioutil.WriteFile("/etc/powerdns/laman_labuh.lua", []byte(luaContent), 0644)
-	if err != nil {
-		fmt.Println("Warning: Failed to write Lua file (expected if not in container):", err)
-	} else {
-		exec.Command("rec_control", "reload-lua-config").Run()
-	}
+	generateLuaConfig()
 
 	return c.JSON(fiber.Map{"message": "Laman Labuh updated successfully", "ips": req.IPs})
 }
@@ -233,6 +269,25 @@ func GetPDNSStats(c *fiber.Ctx) error {
 	// Jika belum ada data dari worker, kirim array kosong bukan nil
 	if currentStatus == nil {
 		currentStatus = []FeedStatus{}
+	}
+
+	var axfrValue string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_axfr_feeds'").Scan(&axfrValue)
+	var axfrFeeds []RPZAXFRFeed
+	if axfrValue != "" {
+		json.Unmarshal([]byte(axfrValue), &axfrFeeds)
+		for _, f := range axfrFeeds {
+			statusStr := "Disconnected"
+			if f.Enabled {
+				statusStr = "AXFR/IXFR Link"
+			}
+			currentStatus = append(currentStatus, FeedStatus{
+				Name:    fmt.Sprintf("Zone: %s", f.ZoneName),
+				Status:  statusStr,
+				Records: 0,
+				Time:    "Native DNS",
+			})
+		}
 	}
 
 	return c.JSON(fiber.Map{
@@ -288,6 +343,30 @@ func SaveRPZFeeds(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "RPZ Feeds updated successfully"})
+}
+
+func GetRPZAXFRFeeds(c *fiber.Ctx) error {
+	var value string
+	err := db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_axfr_feeds'").Scan(&value)
+	if err != nil || value == "" {
+		value = `[]`
+	}
+	var feeds []RPZAXFRFeed
+	json.Unmarshal([]byte(value), &feeds)
+	return c.JSON(fiber.Map{"feeds": feeds})
+}
+
+func SaveRPZAXFRFeeds(c *fiber.Ctx) error {
+	var req RPZAXFRRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	feedsJSON, _ := json.Marshal(req.Feeds)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'rpz_axfr_feeds'", string(feedsJSON))
+	generateLuaConfig()
+
+	return c.JSON(fiber.Map{"message": "AXFR Feeds applied"})
 }
 
 func GetForwarders(c *fiber.Ctx) error {
