@@ -20,6 +20,11 @@ function App() {
   const [lamanLabuh, setLamanLabuh] = useState([]);
   const [aclList, setAclList] = useState([]);
   const [rpzFeeds, setRpzFeeds] = useState([]);
+  const [customBlacklist, setCustomBlacklist] = useState([]);
+  const [customWhitelist, setCustomWhitelist] = useState([]);
+  const [searchRpzQuery, setSearchRpzQuery] = useState('');
+  const [searchRpzResults, setSearchRpzResults] = useState([]);
+  const [isSearchingRpz, setIsSearchingRpz] = useState(false);
   const [rpzAXFR, setRpzAXFR] = useState([]);
   const [syncInterval, setSyncInterval] = useState(1);
   const [domainForwarders, setDomainForwarders] = useState('');
@@ -91,6 +96,11 @@ function App() {
       if(dataRPZ.feeds) setRpzFeeds(dataRPZ.feeds);
       if(dataRPZ.sync_interval) setSyncInterval(dataRPZ.sync_interval);
 
+      const resCustom = await fetch('/api/custom-lists');
+      const dataCustom = await resCustom.json();
+      if(dataCustom.blacklist) setCustomBlacklist(dataCustom.blacklist);
+      if(dataCustom.whitelist) setCustomWhitelist(dataCustom.whitelist);
+
       const resAXFR = await fetch('/api/rpz-axfr');
       const dataAXFR = await resAXFR.json();
       if(dataAXFR.feeds) setRpzAXFR(dataAXFR.feeds);
@@ -144,6 +154,36 @@ function App() {
       });
       showNotification('RPZ Feeds scheduled for sync');
     } catch(e) { showNotification('Failed to update RPZ', 'error'); }
+  };
+
+  const saveCustomLists = async () => {
+    try {
+      await fetch('/api/custom-lists', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          blacklist: customBlacklist.map(d=>d.trim()).filter(d=>d),
+          whitelist: customWhitelist.map(d=>d.trim()).filter(d=>d)
+        })
+      });
+      showNotification('Custom Filters saved and Rule Engine compiled', 'success');
+    } catch(e) { showNotification('Failed to save Custom Lists', 'error'); }
+  };
+
+  const handleSearchRpz = async (e) => {
+    e.preventDefault();
+    if (searchRpzQuery.length < 3) return showNotification('Query min 3 chars', 'error');
+    setIsSearchingRpz(true);
+    try {
+      const res = await fetch('/api/search-rpz?q=' + encodeURIComponent(searchRpzQuery));
+      const data = await res.json();
+      setSearchRpzResults(data.results || []);
+      if (data.results?.length === 0) showNotification('Tidak ada domain yang cocok.', 'success');
+    } catch(err) {
+      showNotification('Gagal mencari di Database RPZ', 'error');
+    } finally {
+      setIsSearchingRpz(false);
+    }
   };
 
   const saveAXFR = async () => {
@@ -644,6 +684,143 @@ function App() {
                   >
                     Save & Sync Feeds
                   </button>
+                </div>
+              </div>
+
+              {/* RPZ Database Search Engine */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3">
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+                  <div>
+                    <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                      <ExternalLink className="w-5 h-5 text-fuchsia-400" />
+                      Compiled RPZ Database Search
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                      Search through millions of loaded Intelligence Feeds to verify if a specific domain or TLD is blocked.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="p-6 bg-slate-950/50 flex flex-col gap-4">
+                  <form onSubmit={handleSearchRpz} className="flex items-center gap-3">
+                    <input 
+                      type="text" 
+                      value={searchRpzQuery}
+                      onChange={e => setSearchRpzQuery(e.target.value)}
+                      placeholder="e.g. reddit.com or pornhub" 
+                      className="flex-1 max-w-lg bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm font-mono text-slate-300 focus:outline-none focus:border-fuchsia-500/50 shadow-inner"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isSearchingRpz}
+                      className="px-6 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.2)] transition-all duration-200 cursor-pointer whitespace-nowrap"
+                    >
+                      {isSearchingRpz ? 'Searching...' : 'Search Database'}
+                    </button>
+                  </form>
+                  
+                  {searchRpzResults.length > 0 && (
+                    <div className="mt-4 border border-slate-800 rounded-lg overflow-hidden">
+                      <div className="bg-slate-900 p-2 border-b border-slate-800 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                        Search Results ({searchRpzResults.length} matches)
+                      </div>
+                      <div className="max-h-60 overflow-y-auto bg-slate-950 p-2 flex flex-col gap-1">
+                        {searchRpzResults.map((res, i) => (
+                          <div key={i} className="px-3 py-1.5 hover:bg-slate-800/50 rounded text-sm font-mono text-slate-300 flex justify-between items-center group">
+                            <span>{res.split(' ')[0]}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${res.includes('[WHITELISTED]') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                              {res.includes('[WHITELISTED]') ? 'WHITELISTED' : 'RPZ BLOCKED'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Custom Whitelist & Blacklist Arrays */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3">
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
+                  <div>
+                    <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                      <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                      Custom Policy Exclusions
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                      Explicitly Whitelist domains to bypass RPZ, or manually Blacklist domains to force block them. 
+                    </p>
+                  </div>
+                  <button 
+                    onClick={saveCustomLists}
+                    className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer flex items-center gap-2"
+                  >
+                    Kompilasi Daftar Kustom
+                  </button>
+                </div>
+                
+                <div className="p-6 bg-slate-950/50 flex flex-col lg:flex-row gap-10 flex-1">
+                  
+                  {/* Whitelist Panel */}
+                  <div className="flex-1 flex flex-col gap-4">
+                     <label className="block text-sm font-bold text-emerald-400 tracking-widest uppercase flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4" /> Global Whitelist
+                     </label>
+                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Bypasses all RPZ and Master Feeds constraints.</p>
+                     
+                     <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-2">
+                        {customWhitelist.map((domain, i) => (
+                           <div key={i} className="flex items-center gap-2 bg-[#0b1120] border border-emerald-900/30 p-2 rounded-lg">
+                              <input 
+                                 type="text" 
+                                 value={domain}
+                                 onChange={e => {
+                                    const next = [...customWhitelist];
+                                    next[i] = e.target.value;
+                                    setCustomWhitelist(next);
+                                 }}
+                                 placeholder="e.g. valid-site.com"
+                                 className="flex-1 bg-transparent text-emerald-100 font-mono text-sm px-2 focus:outline-none placeholder:text-emerald-900/50"
+                              />
+                              <button onClick={() => setCustomWhitelist(customWhitelist.filter((_, idx)=>idx!==i))} className="text-emerald-700 hover:text-red-400 p-1">✕</button>
+                           </div>
+                        ))}
+                     </div>
+                     <button onClick={() => setCustomWhitelist([...customWhitelist, ''])} className="mt-2 py-2 text-xs font-bold text-emerald-500/70 border border-dashed border-emerald-800/50 rounded hover:bg-emerald-900/20 transition-colors">
+                        + Pasang Domain Whitelist
+                     </button>
+                  </div>
+
+                  {/* Blacklist Panel */}
+                  <div className="flex-1 flex flex-col gap-4 border-t lg:border-t-0 lg:border-l border-slate-800 pt-6 lg:pt-0 lg:pl-10">
+                     <label className="block text-sm font-bold text-red-400 tracking-widest uppercase flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4" /> Hard Blocklist
+                     </label>
+                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Force domains into the Laman Labuh RPZ gravity well.</p>
+
+                     <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-2">
+                        {customBlacklist.map((domain, i) => (
+                           <div key={i} className="flex items-center gap-2 bg-[#0b1120] border border-red-900/30 p-2 rounded-lg">
+                              <input 
+                                 type="text" 
+                                 value={domain}
+                                 onChange={e => {
+                                    const next = [...customBlacklist];
+                                    next[i] = e.target.value;
+                                    setCustomBlacklist(next);
+                                 }}
+                                 placeholder="e.g. bad-site.com"
+                                 className="flex-1 bg-transparent text-red-100 font-mono text-sm px-2 focus:outline-none placeholder:text-red-900/50"
+                              />
+                              <button onClick={() => setCustomBlacklist(customBlacklist.filter((_, idx)=>idx!==i))} className="text-red-700 hover:text-red-400 p-1">✕</button>
+                           </div>
+                        ))}
+                     </div>
+                     <button onClick={() => setCustomBlacklist([...customBlacklist, ''])} className="mt-2 py-2 text-xs font-bold text-red-500/70 border border-dashed border-red-800/50 rounded hover:bg-red-900/20 transition-colors">
+                        + Pasang Domain Blocklist
+                     </button>
+                  </div>
+
                 </div>
               </div>
 

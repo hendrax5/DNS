@@ -33,6 +33,11 @@ type ACLRequest struct {
 	IPs []string `json:"ips"`
 }
 
+type CustomListsRequest struct {
+	Blacklist []string `json:"blacklist"`
+	Whitelist []string `json:"whitelist"`
+}
+
 type RPZFeed struct {
 	URL     string `json:"url"`
 	Enabled bool   `json:"enabled"`
@@ -114,6 +119,10 @@ func main() {
 	api.Get("/stats", GetPDNSStats)
     api.Get("/top-analytics", GetTopAnalytics)
     api.Get("/check-domain", CheckDomainBlock)
+	api.Get("/search-rpz", SearchRPZ)
+
+	api.Get("/custom-lists", GetCustomLists)
+	api.Post("/custom-lists", SaveCustomLists)
 
 	// WebSocket handler
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -175,6 +184,8 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_feeds', 'https://trustpositif.kominfo.go.id/')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('domain_forwarders', 'kominfo.go.id,8.8.8.8,1.1.1.1')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('parent_resolvers', ',,,,,')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('custom_blacklist', '')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('custom_whitelist', '')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1440')`)
 	db.Exec(`UPDATE settings SET value = '1440' WHERE key = 'rpz_sync_interval' AND value = '1'`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
@@ -481,6 +492,25 @@ func syncRPZWorker() {
 				"@ IN NS localhost.",
 				"",
 			}
+
+			// Load custom whitelist to override blacklist/RPZ
+			var wlStr string
+			db.QueryRow("SELECT value FROM settings WHERE key = 'custom_whitelist'").Scan(&wlStr)
+			wlMap := make(map[string]bool)
+			for _, d := range strings.Split(wlStr, "\n") {
+				d = strings.TrimSpace(d)
+				if d != "" { wlMap[d] = true }
+			}
+
+			// Load Custom Blacklist & Deduplicate
+			var blStr string
+			db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&blStr)
+			for _, d := range strings.Split(blStr, "\n") {
+				d = strings.TrimSpace(d)
+				if d != "" && !wlMap[d] {
+					compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME .", d))
+				}
+			}
 			
 			for _, f := range feeds {
 				u := strings.TrimSpace(f.URL)
@@ -515,15 +545,27 @@ func syncRPZWorker() {
 					validCount := 0
 					for _, line := range lines {
 						line = strings.TrimSpace(line)
-						if line != "" && !strings.HasPrefix(line, "#") {
-							// Basic sanitize: Remove http/https if wrongly formatted in feed
-							line = strings.ReplaceAll(line, "http://", "")
-							line = strings.ReplaceAll(line, "https://", "")
-							line = strings.Split(line, "/")[0]
-							// Ensure only valid domains are appended
-							if !strings.Contains(line, " ") {
+						if line == "" || strings.HasPrefix(line, "#") { continue }
+						
+						parts := strings.Fields(line)
+						domain := ""
+						if len(parts) == 1 {
+							domain = parts[0]
+						} else if len(parts) >= 2 {
+							if parts[0] == "0.0.0.0" || parts[0] == "127.0.0.1" {
+								domain = parts[1]
+							}
+						}
+
+						if domain != "" && domain != "localhost" && domain != "local" {
+							domain = strings.ReplaceAll(domain, "http://", "")
+							domain = strings.ReplaceAll(domain, "https://", "")
+							domain = strings.Split(domain, "/")[0]
+							
+							// Ensure not whitelisted
+							if !wlMap[domain] {
 								validCount++
-								compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME .", line))
+								compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME .", domain))
 							}
 						}
 					}
@@ -552,6 +594,11 @@ func syncRPZWorker() {
 			feedMutex.Lock()
 			feedStatuses = newStatuses
 			feedMutex.Unlock()
+
+			// Write Whitelist explicit rules at bottom to guarantee parsing validity
+			for d := range wlMap {
+				compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME rpz-passthru.", d))
+			}
 
 			// Write Compiled RPZ Zone Master to disk
 			errWrite := ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte(strings.Join(compiledLines, "\n")), 0644)
@@ -661,6 +708,59 @@ func streamLogs() {
 			metricsMutex.Unlock()
 		}
 	}
+}
+
+func GetCustomLists(c *fiber.Ctx) error {
+	var bl, wl string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&bl)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'custom_whitelist'").Scan(&wl)
+	
+	blArr, wlArr := []string{}, []string{}
+	for _, x := range strings.Split(bl, "\n") { if x != "" { blArr = append(blArr, x) } }
+	for _, x := range strings.Split(wl, "\n") { if x != "" { wlArr = append(wlArr, x) } }
+	
+	return c.JSON(fiber.Map{"blacklist": blArr, "whitelist": wlArr})
+}
+
+func SaveCustomLists(c *fiber.Ctx) error {
+	var req CustomListsRequest
+	if err := c.BodyParser(&req); err != nil { return c.Status(400).JSON(fiber.Map{"error":"bad request"}) }
+	
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'custom_blacklist'", strings.Join(req.Blacklist, "\n"))
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'custom_whitelist'", strings.Join(req.Whitelist, "\n"))
+	
+	select { case forceSync <- true: default: }
+	return c.JSON(fiber.Map{"message": "Custom Lists Updates Saved"})
+}
+
+func SearchRPZ(c *fiber.Ctx) error {
+	q := c.Query("q")
+	if len(q) < 3 {
+		return c.Status(400).JSON(fiber.Map{"error": "Query minimal 3 karakter"})
+	}
+
+	cmd := exec.Command("grep", "-i", "-m", "100", q, "/etc/powerdns/rpz_compiled.zone")
+	out, err := cmd.Output()
+	if err != nil {
+		return c.JSON(fiber.Map{"results": []string{}})
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var results []string
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" && !strings.HasPrefix(l, "$") && !strings.HasPrefix(l, "@ ") {
+			parts := strings.Fields(l)
+			action := "BLOCKED"
+			if len(parts) >= 3 && parts[2] == "rpz-passthru." {
+				action = "WHITELISTED"
+			}
+			if len(parts) > 0 {
+				results = append(results, fmt.Sprintf("%s [%s]", parts[0], action))
+			}
+		}
+	}
+	return c.JSON(fiber.Map{"results": results})
 }
 
 func CheckDomainBlock(c *fiber.Ctx) error {
