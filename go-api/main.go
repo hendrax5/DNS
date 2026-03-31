@@ -73,6 +73,11 @@ type FeedStatus struct {
 	Time    string `json:"time"`
 }
 
+type ClientStat struct {
+	Allow int `json:"allow"`
+	Block int `json:"block"`
+}
+
 var (
 	feedStatuses []FeedStatus
 	feedMutex    sync.RWMutex
@@ -80,7 +85,7 @@ var (
 
 	wsClients    = make(map[*websocket.Conn]bool)
 	clientMutex  sync.Mutex
-	topClients   = make(map[string]int)
+	topClients   = make(map[string]*ClientStat)
 	topDomains   = make(map[string]int)
 	metricsMutex sync.RWMutex
 )
@@ -124,6 +129,9 @@ func main() {
 
 	api.Get("/custom-lists", GetCustomLists)
 	api.Post("/custom-lists", SaveCustomLists)
+
+	api.Get("/advanced-config", GetAdvancedConfig)
+	api.Post("/advanced-config", SaveAdvancedConfig)
 
 	// WebSocket handler
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -187,6 +195,8 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('parent_resolvers', ',,,,,')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('custom_blacklist', '')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('custom_whitelist', '')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('safesearch_enabled', 'false')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('dnssec_enabled', 'false')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1440')`)
 	db.Exec(`UPDATE settings SET value = '1440' WHERE key = 'rpz_sync_interval' AND value = '1'`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
@@ -204,8 +214,49 @@ func initDB() {
 	}
 
 	// ALWAYS securely regenerate PowerDNS Lua mappings on Startup!
-	log.Println("Regenerating PowerDNS Lua mappings based on DB State...")
+	log.Println("Regenerating PowerDNS config files based on DB State...")
 	generateLuaConfig()
+	generateACLConfig()
+	generateForwardersConfig()
+}
+
+func generateACLConfig() {
+	var ipsStr string
+	err := db.QueryRow("SELECT value FROM settings WHERE key = 'acl_ips'").Scan(&ipsStr)
+	if err == nil {
+		ioutil.WriteFile("/etc/powerdns/allowed_ips.txt", []byte(ipsStr), 0644)
+	}
+}
+
+func generateForwardersConfig() {
+	var domFwd, parResStr string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'domain_forwarders'").Scan(&domFwd)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'parent_resolvers'").Scan(&parResStr)
+
+	var fileLines []string
+	for _, line := range strings.Split(domFwd, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" { continue }
+		parts := strings.Split(line, ",")
+		if len(parts) >= 2 {
+			domain := strings.TrimSpace(parts[0])
+			var ips []string
+			for _, ip := range parts[1:] {
+				ip = strings.TrimSpace(ip)
+				if ip != "" { ips = append(ips, ip) }
+			}
+			if len(ips) > 0 { fileLines = append(fileLines, fmt.Sprintf("+%s=%s", domain, strings.Join(ips, ";"))) }
+		}
+	}
+
+	var pIPs []string
+	for _, ip := range strings.Split(parResStr, ",") {
+		ip = strings.TrimSpace(ip)
+		if ip != "" { pIPs = append(pIPs, ip) }
+	}
+	if len(pIPs) > 0 { fileLines = append(fileLines, fmt.Sprintf("+.=%s", strings.Join(pIPs, ";"))) }
+
+	ioutil.WriteFile("/etc/powerdns/forward_zones.txt", []byte(strings.Join(fileLines, "\n")), 0644)
 }
 
 func generateLuaConfig() {
@@ -229,7 +280,36 @@ func generateLuaConfig() {
 		}
 	}
 
+	var safesearch string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'safesearch_enabled'").Scan(&safesearch)
+	if safesearch == "true" {
+		safeZone := `$ORIGIN rpz.local.
+$TTL 60
+@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H
+@ IN NS localhost.
+
+google.com CNAME forcesafesearch.google.com.
+www.google.com CNAME forcesafesearch.google.com.
+bing.com CNAME strict.bing.com.
+www.bing.com CNAME strict.bing.com.
+duckduckgo.com CNAME safe.duckduckgo.com.
+yandex.com CNAME yandex.com.
+`
+		ioutil.WriteFile("/etc/powerdns/safesearch.zone", []byte(safeZone), 0644)
+		luaContent += `rpzFile("/etc/powerdns/safesearch.zone")` + "\n"
+	}
+
 	ioutil.WriteFile("/etc/powerdns/laman_labuh.lua", []byte(luaContent), 0644)
+
+	var dnssec string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'dnssec_enabled'").Scan(&dnssec)
+	if dnssec == "true" {
+		exec.Command("sed", "-i", "s/^dnssec=.*/dnssec=process/", "/etc/powerdns/recursor.conf").Run()
+	} else {
+		exec.Command("sed", "-i", "s/^dnssec=.*/dnssec=off/", "/etc/powerdns/recursor.conf").Run()
+	}
+
+	// Hot reload PowerDNS settings without rebooting the container
 	exec.Command("rec_control", "reload-lua-config").Run()
 }
 
@@ -280,14 +360,46 @@ func SaveACL(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	err = ioutil.WriteFile("/etc/powerdns/allowed_ips.txt", []byte(ipsStr), 0644)
-	if err != nil {
-		fmt.Println("Warning: Failed to write ACL file (expected if not in container):", err)
-	} else {
-		exec.Command("rec_control", "reload-lua-script").Run()
-	}
+	generateACLConfig()
+	exec.Command("rec_control", "reload-lua-script").Run()
 
 	return c.JSON(fiber.Map{"message": "ACL updated successfully", "ips": req.IPs})
+}
+
+func GetAdvancedConfig(c *fiber.Ctx) error {
+	var safesearch, dnssec string
+	err1 := db.QueryRow("SELECT value FROM settings WHERE key = 'safesearch_enabled'").Scan(&safesearch)
+	err2 := db.QueryRow("SELECT value FROM settings WHERE key = 'dnssec_enabled'").Scan(&dnssec)
+	
+	if err1 != nil { safesearch = "false" }
+	if err2 != nil { dnssec = "false" }
+
+	return c.JSON(fiber.Map{
+		"safesearch": safesearch == "true",
+		"dnssec": dnssec == "true",
+	})
+}
+
+func SaveAdvancedConfig(c *fiber.Ctx) error {
+	var req struct {
+		Safesearch bool `json:"safesearch"`
+		Dnssec     bool `json:"dnssec"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	safesearchStr := "false"
+	if req.Safesearch { safesearchStr = "true" }
+	dnssecStr := "false"
+	if req.Dnssec { dnssecStr = "true" }
+
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'safesearch_enabled'", safesearchStr)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'dnssec_enabled'", dnssecStr)
+
+	generateLuaConfig()
+
+	return c.JSON(fiber.Map{"message": "Advanced config updated"})
 }
 
 func GetPDNSStats(c *fiber.Ctx) error {
@@ -295,11 +407,6 @@ func GetPDNSStats(c *fiber.Ctx) error {
 	currentStatus := make([]FeedStatus, len(feedStatuses))
 	copy(currentStatus, feedStatuses)
 	feedMutex.RUnlock()
-
-	// Fallback empty array
-	if currentStatus == nil {
-		currentStatus = []FeedStatus{}
-	}
 
 	var axfrValue string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_axfr_feeds'").Scan(&axfrValue)
@@ -472,41 +579,8 @@ func SaveForwarders(c *fiber.Ctx) error {
 	parResStr := strings.Join(req.ParentResolvers, ",")
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'parent_resolvers'", parResStr)
 
-	var fileLines []string
-
-	lines := strings.Split(req.DomainForwarders, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" { continue }
-		parts := strings.Split(line, ",")
-		if len(parts) >= 2 {
-			domain := strings.TrimSpace(parts[0])
-			var ips []string
-			for _, ip := range parts[1:] {
-				ip = strings.TrimSpace(ip)
-				if ip != "" { ips = append(ips, ip) }
-			}
-			if len(ips) > 0 {
-				fileLines = append(fileLines, fmt.Sprintf("+%s=%s", domain, strings.Join(ips, ";")))
-			}
-		}
-	}
-
-	var pIPs []string
-	for _, ip := range req.ParentResolvers {
-		ip = strings.TrimSpace(ip)
-		if ip != "" { pIPs = append(pIPs, ip) }
-	}
-	if len(pIPs) > 0 {
-		fileLines = append(fileLines, fmt.Sprintf("+.=%s", strings.Join(pIPs, ";")))
-	}
-
-	err := ioutil.WriteFile("/etc/powerdns/forward_zones.txt", []byte(strings.Join(fileLines, "\n")), 0644)
-	if err != nil {
-		fmt.Println("Warning: Failed to write forward zones file:", err)
-	} else {
-		exec.Command("rec_control", "reload-zones").Run()
-	}
+	generateForwardersConfig()
+	exec.Command("rec_control", "reload-zones").Run()
 
 	return c.JSON(fiber.Map{"message": "Forwarders updated successfully"})
 }
@@ -684,15 +758,17 @@ func GetTopAnalytics(c *fiber.Ctx) error {
 	type Stat struct {
 		Name  string `json:"name"`
 		Count int    `json:"count"`
+		Allow int    `json:"allow,omitempty"`
+		Block int    `json:"block,omitempty"`
 	}
 
 	var clients []Stat
 	for k, v := range topClients {
-		clients = append(clients, Stat{k, v})
+		clients = append(clients, Stat{Name: k, Count: v.Allow + v.Block, Allow: v.Allow, Block: v.Block})
 	}
 	var domains []Stat
 	for k, v := range topDomains {
-		domains = append(domains, Stat{k, v})
+		domains = append(domains, Stat{Name: k, Count: v})
 	}
 
 	return c.JSON(fiber.Map{
@@ -752,8 +828,20 @@ func streamLogs() {
 		var entry map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &entry); err == nil {
 			metricsMutex.Lock()
+			action := ""
+			if a, ok := entry["action"].(string); ok {
+				action = a
+			}
+
 			if ip, ok := entry["ip"].(string); ok {
-				topClients[ip]++
+				if topClients[ip] == nil {
+					topClients[ip] = &ClientStat{}
+				}
+				if action == "ALLOW" {
+					topClients[ip].Allow++
+				} else {
+					topClients[ip].Block++
+				}
 			}
 			if domain, ok := entry["qname"].(string); ok {
 				topDomains[domain]++

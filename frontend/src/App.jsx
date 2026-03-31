@@ -36,6 +36,11 @@ function App() {
   const [liveLogs, setLiveLogs] = useState([]);
   const [topAnalytics, setTopAnalytics] = useState({ clients: [], domains: [] });
 
+  // Advanced Config
+  const [safeSearch, setSafeSearch] = useState(false);
+  const [dnssec, setDnssec] = useState(false);
+  const [tproxy, setTproxy] = useState(true);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -112,6 +117,11 @@ function App() {
       const dataFwd = await resFwd.json();
       if(dataFwd.domain_forwarders !== undefined) setDomainForwarders(dataFwd.domain_forwarders);
       if(dataFwd.parent_resolvers) setParentResolvers(dataFwd.parent_resolvers);
+
+      const resAdv = await fetch('/api/advanced-config');
+      const dataAdv = await resAdv.json();
+      if(dataAdv.safesearch !== undefined) setSafeSearch(dataAdv.safesearch);
+      if(dataAdv.dnssec !== undefined) setDnssec(dataAdv.dnssec);
     } catch(e) { console.error(e) }
   };
 
@@ -146,6 +156,17 @@ function App() {
       });
       showNotification('Access Control List (ACL) enforced');
     } catch(e) { showNotification('Failed to update ACL', 'error'); }
+  };
+
+  const saveAdvancedConfig = async () => {
+    try {
+      await fetch('/api/advanced-config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({safesearch: safeSearch, dnssec})
+      });
+      showNotification('Advanced Security Settings Applied!');
+    } catch(e) { showNotification('Failed to save settings', 'error'); }
   };
 
   const saveRPZ = async () => {
@@ -479,7 +500,10 @@ function App() {
                    {topAnalytics.clients.map((c, i) => (
                      <div key={i} className="flex justify-between items-center px-4 py-2 bg-slate-950 rounded-lg border border-slate-800/50">
                        <span className="text-blue-400 text-sm font-mono flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{c.name}</span>
-                       <span className="text-slate-300 font-medium text-sm">{c.count.toLocaleString()}</span>
+                       <div className="flex gap-2 text-xs font-medium">
+                         <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{c.allow ? c.allow.toLocaleString() : 0} Allow</span>
+                         <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">{c.block ? c.block.toLocaleString() : 0} Block</span>
+                       </div>
                      </div>
                    ))}
                    {topAnalytics.clients.length === 0 && <span className="text-slate-500 text-sm">No data yet...</span>}
@@ -511,6 +535,7 @@ function App() {
               <button onClick={() => setAdminTab('threats')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'threats' ? 'bg-fuchsia-600 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldAlert className="w-4 h-4 inline-block mr-2" />Threat Intel & RPZ</button>
               <button onClick={() => setAdminTab('forwarding')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'forwarding' ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />Global Forwarding</button>
               <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Access Control</button>
+              <button onClick={() => setAdminTab('options')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'options' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Server className="w-4 h-4 inline-block mr-2" />Security Options</button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -1122,6 +1147,58 @@ function App() {
                 </div>
               </div>
               </>
+              )}
+
+              {/* === TAB: SECURITY OPTIONS === */}
+              {adminTab === 'options' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3 pb-4 shadow-lg">
+                  <div className="p-6 border-b border-slate-800">
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                      <Server className="w-6 h-6 text-amber-500" /> Advanced DNS Operations
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-3">Configure deep-level protocol behaviours including upstream cryptography and enforced traffic routing.</p>
+                  </div>
+                  <div className="p-6 space-y-6 flex-1 bg-slate-950/30">
+                    
+                    {/* SafeSearch */}
+                    <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-800/50 bg-[#0b1120]">
+                      <div className="pt-1">
+                        <input type="checkbox" id="safesearch" checked={safeSearch} onChange={(e) => setSafeSearch(e.target.checked)} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900 cursor-pointer accent-amber-500" />
+                      </div>
+                      <div>
+                        <label htmlFor="safesearch" className="text-white font-semibold cursor-pointer text-base">Safesearch Enforce</label>
+                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Forced safesearch pada Google, Bing, Yandex, dan Duckduckgo via injected RPZ CNAME resolution.</p>
+                      </div>
+                    </div>
+
+                    {/* Tproxy */}
+                    <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-800/50 bg-[#0b1120]">
+                      <div className="pt-1">
+                        <input type="checkbox" id="tproxy" checked={tproxy} onChange={(e) => setTproxy(e.target.checked)} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900 cursor-pointer accent-emerald-500" />
+                      </div>
+                      <div>
+                        <label htmlFor="tproxy" className="text-white font-semibold cursor-pointer text-base">Tproxy Support (Transparent)</label>
+                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Accept Transparent DNS Server queries pada tcp/udp port 53. Server DNS kita otomatis melayani intersepsi NAT Firewall secara default.</p>
+                      </div>
+                    </div>
+
+                    {/* DNSSEC */}
+                    <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-800/50 bg-[#0b1120]">
+                      <div className="pt-1">
+                        <input type="checkbox" id="dnssec" checked={dnssec} onChange={(e) => setDnssec(e.target.checked)} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-rose-500 focus:ring-offset-slate-900 cursor-pointer accent-rose-500" />
+                      </div>
+                      <div>
+                        <label htmlFor="dnssec" className="text-white font-semibold cursor-pointer text-base">DNSSEC Validation</label>
+                        <p className="text-slate-400 text-sm mt-1 leading-relaxed">Enable strict cryptographic signature validation (BOGUS zones dropped). Peringatan: Akses diblokir seketika jika sertifikat domain kedaluwarsa.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end px-6">
+                    <button onClick={saveAdvancedConfig} className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold tracking-wide rounded-lg shadow-[0_0_15px_rgba(217,119,6,0.3)] transition-colors cursor-pointer flex items-center gap-2">
+                       Apply Settings
+                    </button>
+                  </div>
+                </div>
               )}
 
             </div>
