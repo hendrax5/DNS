@@ -20,12 +20,19 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
 
 var db *sql.DB
+var jwtSecret = []byte("!NetShield_V2_Secret_2026")
 
 // DTOs
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
 type LamanLabuhRequest struct {
 	IPs []string `json:"ips"`
 }
@@ -107,31 +114,52 @@ func main() {
 
 	api := app.Group("/api")
 
-	api.Get("/laman-labuh", GetLamanLabuh)
-	api.Post("/laman-labuh", SaveLamanLabuh)
-
-	api.Get("/acl", GetACL)
-	api.Post("/acl", SaveACL)
-
-	api.Get("/rpz-feeds", GetRPZFeeds)
-	api.Post("/rpz-feeds", SaveRPZFeeds)
-
-	api.Get("/rpz-axfr", GetRPZAXFRFeeds)
-	api.Post("/rpz-axfr", SaveRPZAXFRFeeds)
-
-	api.Get("/forwarders", GetForwarders)
-	api.Post("/forwarders", SaveForwarders)
-
+	// Public Routes
+	api.Post("/login", LoginHandler)
 	api.Get("/stats", GetPDNSStats)
     api.Get("/top-analytics", GetTopAnalytics)
     api.Get("/check-domain", CheckDomainBlock)
-	api.Get("/search-rpz", SearchRPZ)
 
-	api.Get("/custom-lists", GetCustomLists)
-	api.Post("/custom-lists", SaveCustomLists)
+	// Auth Middleware
+	authGuard := func(c *fiber.Ctx) error {
+		authHeader := c.Get("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			return c.Status(401).JSON(fiber.Map{"error": "Unauthorized"})
+		}
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			return jwtSecret, nil
+		})
+		if err != nil || !token.Valid {
+			return c.Status(401).JSON(fiber.Map{"error": "Invalid token"})
+		}
+		return c.Next()
+	}
 
-	api.Get("/advanced-config", GetAdvancedConfig)
-	api.Post("/advanced-config", SaveAdvancedConfig)
+	admin := api.Group("/", authGuard)
+
+	admin.Get("/laman-labuh", GetLamanLabuh)
+	admin.Post("/laman-labuh", SaveLamanLabuh)
+
+	admin.Get("/acl", GetACL)
+	admin.Post("/acl", SaveACL)
+
+	admin.Get("/rpz-feeds", GetRPZFeeds)
+	admin.Post("/rpz-feeds", SaveRPZFeeds)
+
+	admin.Get("/rpz-axfr", GetRPZAXFRFeeds)
+	admin.Post("/rpz-axfr", SaveRPZAXFRFeeds)
+
+	admin.Get("/forwarders", GetForwarders)
+	admin.Post("/forwarders", SaveForwarders)
+
+	admin.Get("/search-rpz", SearchRPZ)
+
+	admin.Get("/custom-lists", GetCustomLists)
+	admin.Post("/custom-lists", SaveCustomLists)
+
+	admin.Get("/advanced-config", GetAdvancedConfig)
+	admin.Post("/advanced-config", SaveAdvancedConfig)
 
 	// WebSocket handler
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -180,12 +208,23 @@ func initDB() {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		key TEXT UNIQUE NOT NULL,
 		value TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		email TEXT UNIQUE NOT NULL,
+		password_hash TEXT NOT NULL
 	);`
 	_, err = db.Exec(createTableSQL)
 	if err != nil {
 		// Fallback to local DB for dev without /data mapping
 		db, _ = sql.Open("sqlite", "netshield.db")
 		db.Exec(createTableSQL)
+	}
+
+	// Inject default user hendra@servicex.id / !Tahun2026_
+	hash, err := bcrypt.GenerateFromPassword([]byte("!Tahun2026_"), bcrypt.DefaultCost)
+	if err == nil {
+		db.Exec(`INSERT OR IGNORE INTO users (email, password_hash) VALUES (?, ?)`, "hendra@servicex.id", string(hash))
 	}
 
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('laman_labuh_ip', '139.255.196.196')`)
@@ -311,6 +350,36 @@ yandex.com CNAME yandex.com.
 
 	// Hot reload PowerDNS settings without rebooting the container
 	exec.Command("rec_control", "reload-lua-config").Run()
+}
+
+func LoginHandler(c *fiber.Ctx) error {
+	var req LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	var hash string
+	err := db.QueryRow("SELECT password_hash FROM users WHERE email = ?", req.Email).Scan(&hash)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid email or password"})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid email or password"})
+	}
+
+	claims := jwt.MapClaims{
+		"email": req.Email,
+		"exp":   time.Now().Add(time.Hour * 24).Unix(), // 24 jam
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	t, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Could not generate token"})
+	}
+
+	return c.JSON(fiber.Map{"token": t, "email": req.Email})
 }
 
 func GetLamanLabuh(c *fiber.Ctx) error {

@@ -12,13 +12,65 @@ import {
   CheckCircle2,
   ExternalLink,
   Cpu,
-  HardDrive
+  HardDrive,
+  LogIn,
+  LogOut,
+  Database,
+  KeyRound,
+  LockOpen
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState('dashboard');
   const [adminTab, setAdminTab] = useState('threats');
+
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('jwtToken'));
+  const [jwtToken, setJwtToken] = useState(localStorage.getItem('jwtToken') || '');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setJwtToken('');
+    localStorage.removeItem('jwtToken');
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: loginEmail, password: loginPassword})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setJwtToken(data.token);
+        localStorage.setItem('jwtToken', data.token);
+        setIsAuthenticated(true);
+      } else {
+        setLoginError(data.error || 'Login failed');
+      }
+    } catch(err) {
+      setLoginError('Server terputus');
+    }
+  };
+
+  const apiFetch = async (url, options = {}) => {
+    const headers = { ...options.headers };
+    const token = localStorage.getItem('jwtToken');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      handleLogout();
+    }
+    return res;
+  };
+
+
   const [stats, setStats] = useState(null);
   const [lamanLabuh, setLamanLabuh] = useState([]);
   const [aclList, setAclList] = useState([]);
@@ -91,34 +143,34 @@ function App() {
 
   const loadSettings = async () => {
     try {
-      const resLL = await fetch('/api/laman-labuh');
+      const resLL = await apiFetch('/api/laman-labuh');
       const dataLL = await resLL.json();
       if(dataLL.ips) setLamanLabuh(dataLL.ips.filter(Boolean));
 
-      const resACL = await fetch('/api/acl');
+      const resACL = await apiFetch('/api/acl');
       const dataACL = await resACL.json();
       if(dataACL.ips) setAclList(dataACL.ips.filter(Boolean));
 
-      const resRPZ = await fetch('/api/rpz-feeds');
+      const resRPZ = await apiFetch('/api/rpz-feeds');
       const dataRPZ = await resRPZ.json();
       if(dataRPZ.feeds) setRpzFeeds(dataRPZ.feeds);
       if(dataRPZ.sync_interval) setSyncInterval(dataRPZ.sync_interval);
 
-      const resCustom = await fetch('/api/custom-lists');
+      const resCustom = await apiFetch('/api/custom-lists');
       const dataCustom = await resCustom.json();
       if(dataCustom.blacklist) setCustomBlacklist(dataCustom.blacklist);
       if(dataCustom.whitelist) setCustomWhitelist(dataCustom.whitelist);
 
-      const resAXFR = await fetch('/api/rpz-axfr');
+      const resAXFR = await apiFetch('/api/rpz-axfr');
       const dataAXFR = await resAXFR.json();
       if(dataAXFR.feeds) setRpzAXFR(dataAXFR.feeds);
 
-      const resFwd = await fetch('/api/forwarders');
+      const resFwd = await apiFetch('/api/forwarders');
       const dataFwd = await resFwd.json();
       if(dataFwd.domain_forwarders !== undefined) setDomainForwarders(dataFwd.domain_forwarders);
       if(dataFwd.parent_resolvers) setParentResolvers(dataFwd.parent_resolvers);
 
-      const resAdv = await fetch('/api/advanced-config');
+      const resAdv = await apiFetch('/api/advanced-config');
       const dataAdv = await resAdv.json();
       if(dataAdv.safesearch !== undefined) setSafeSearch(dataAdv.safesearch);
       if(dataAdv.dnssec !== undefined) setDnssec(dataAdv.dnssec);
@@ -126,8 +178,10 @@ function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'admin') loadSettings();
-  }, [activeTab]);
+    if (activeTab === 'admin' && isAuthenticated) {
+      loadSettings();
+    }
+  }, [activeTab, isAuthenticated]);
 
   const showNotification = (message, type = 'success') => {
     setSaveStatus({ show: true, message, type });
@@ -137,7 +191,7 @@ function App() {
   const saveLamanLabuh = async () => {
     try {
       const ips = lamanLabuh.map(i=>i.trim()).filter(i=>i);
-      await fetch('/api/laman-labuh', {
+      await apiFetch('/api/laman-labuh', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ips})
@@ -149,7 +203,7 @@ function App() {
   const saveACL = async () => {
     try {
       const ips = aclList.map(i=>i.trim()).filter(i=>i);
-      await fetch('/api/acl', {
+      await apiFetch('/api/acl', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ips})
@@ -160,7 +214,7 @@ function App() {
 
   const saveAdvancedConfig = async () => {
     try {
-      await fetch('/api/advanced-config', {
+      await apiFetch('/api/advanced-config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({safesearch: safeSearch, dnssec})
@@ -171,7 +225,7 @@ function App() {
 
   const saveRPZ = async () => {
     try {
-      await fetch('/api/rpz-feeds', {
+      await apiFetch('/api/rpz-feeds', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ feeds: rpzFeeds.filter(f => f.url.trim()), sync_interval: syncInterval })
@@ -182,7 +236,7 @@ function App() {
 
   const saveCustomLists = async () => {
     try {
-      await fetch('/api/custom-lists', {
+      await apiFetch('/api/custom-lists', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -199,7 +253,7 @@ function App() {
     if (searchRpzQuery.length < 3) return showNotification('Query min 3 chars', 'error');
     setIsSearchingRpz(true);
     try {
-      const res = await fetch('/api/search-rpz?q=' + encodeURIComponent(searchRpzQuery));
+      const res = await apiFetch('/api/search-rpz?q=' + encodeURIComponent(searchRpzQuery));
       const data = await res.json();
       setSearchRpzResults(data.results || []);
       if (data.results?.length === 0) showNotification('Tidak ada domain yang cocok.', 'success');
@@ -212,7 +266,7 @@ function App() {
 
   const saveAXFR = async () => {
     try {
-      await fetch('/api/rpz-axfr', {
+      await apiFetch('/api/rpz-axfr', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ feeds: rpzAXFR.filter(f => f.master_ip.trim() && f.zone_name.trim()) })
@@ -223,7 +277,7 @@ function App() {
 
   const saveForwarders = async () => {
     try {
-      await fetch('/api/forwarders', {
+      await apiFetch('/api/forwarders', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -252,7 +306,12 @@ function App() {
             <span className="text-xl font-bold tracking-tight text-white">NetShield<span className="text-slate-400 font-medium">Enterprise</span></span>
           </div>
           
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+            {isAuthenticated && (
+              <button onClick={handleLogout} className="px-3 py-1.5 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium mr-2">
+                <LogOut className="w-4 h-4 inline-block" />
+              </button>
+            )}
             <button 
               onClick={() => setActiveTab('dashboard')}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 cursor-pointer ${
@@ -290,6 +349,42 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
+                {activeTab === 'admin' && !isAuthenticated && (
+          <div className="flex items-center justify-center min-h-[70vh]">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-indigo-500"></div>
+              <div className="text-center mb-8">
+                <div className="bg-slate-950 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-800 shadow-inner">
+                  <KeyRound className="w-8 h-8 text-indigo-400" />
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight">Otorisasi Keamanan</h1>
+                <p className="text-slate-400 text-sm mt-2">Silakan login untuk mengakses Security Profile.</p>
+              </div>
+
+              {loginError && (
+                <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 text-red-400 text-sm">
+                  <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <p>{loginError}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Admin</label>
+                  <input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required placeholder="admin@domain.com" className="w-full bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Kata Sandi</label>
+                  <input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
+                </div>
+                <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg transition-colors shadow-[0_0_15px_rgba(79,70,229,0.3)] mt-4">
+                  Buka Kunci (Login)
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'dashboard' ? (
           <div className="space-y-6">
             <div className="flex justify-between items-end">
@@ -524,8 +619,13 @@ function App() {
                </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'admin' && isAuthenticated ? (
           <div className="space-y-6 flex flex-col h-full">
+            <div className="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-lg text-indigo-300 w-max mb-2 shadow-inner">
+               <LockOpen className="w-4 h-4" /> 
+               <span className="text-sm font-medium">Sesi Aktif: {loginEmail || 'Admin NetShield'}</span>
+            </div>
+
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">Kebijakan Keamanan</h1>
               <p className="text-slate-400 text-sm mt-1">Kelola perutean intelijen ancaman, akses jaringan, dan kepatuhan keamanan.</p>
@@ -1097,7 +1197,7 @@ function App() {
 
             </div>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   );
