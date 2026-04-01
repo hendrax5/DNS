@@ -52,10 +52,17 @@ elif [ "$RAM_MB" -gt 3000 ]; then CACHE_ENTRIES=1000000
 else CACHE_ENTRIES=500000
 fi
 
-echo "  -> Hardware: $CORES CPU Cores | ${RAM_MB}MB RAM"
-echo "  -> DNS Config: threads=$CORES, cache_entries=$CACHE_ENTRIES"
+# Multiplier: PowerDNS limits concurrent UDP socket wait-states per thread.
+# Best practice is 4x to 8x the physical core count for Recursor UDP.
+PDNS_THREADS=$(( CORES * 4 ))
+if [ "$PDNS_THREADS" -lt 16 ]; then
+    PDNS_THREADS=16  # Minimum 16 threads for high QoS burst handling
+fi
 
-sed -i "s/^threads=.*/threads=${CORES}/" pdns_config/recursor.conf
+echo "  -> Hardware: $CORES CPU Cores | ${RAM_MB}MB RAM"
+echo "  -> DNS Config: threads=$PDNS_THREADS, cache_entries=$CACHE_ENTRIES"
+
+sed -i "s/^threads=.*/threads=${PDNS_THREADS}/" pdns_config/recursor.conf
 sed -i "s/^max-cache-entries=.*/max-cache-entries=${CACHE_ENTRIES}/" pdns_config/recursor.conf
 sed -i "s/^max-packetcache-entries=.*/max-packetcache-entries=${CACHE_ENTRIES}/" pdns_config/recursor.conf
 
