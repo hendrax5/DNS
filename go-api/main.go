@@ -739,12 +739,16 @@ func syncRPZWorker() {
 			}
 
 			// Load Custom Blacklist & Deduplicate
+			domainMap := make(map[string]struct{})
+			rootCounts := make(map[string]int)
+
 			var blStr string
 			db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&blStr)
 			for _, d := range strings.Split(blStr, "\n") {
 				d = sanitizeDomain(d)
 				if d != "" && !wlMap[d] && strings.Contains(d, ".") && !strings.ContainsAny(d, " _#/") && net.ParseIP(d) == nil {
-					compiledLines = append(compiledLines, fmt.Sprintf("%s %s", d, blockAction))
+					domainMap[d] = struct{}{}
+					rootCounts[getBaseDomain(d)]++
 				}
 			}
 			
@@ -800,7 +804,8 @@ func syncRPZWorker() {
 							// Ensure not whitelisted, valid format, and absolutely NOT an IP address!
 							if !wlMap[domain] && strings.Contains(domain, ".") && !strings.ContainsAny(domain, " _#/") && net.ParseIP(domain) == nil {
 								validCount++
-								compiledLines = append(compiledLines, fmt.Sprintf("%s %s", domain, blockAction))
+								domainMap[domain] = struct{}{}
+								rootCounts[getBaseDomain(domain)]++
 							}
 						}
 					}
@@ -829,6 +834,23 @@ func syncRPZWorker() {
 			feedMutex.Lock()
 			feedStatuses = newStatuses
 			feedMutex.Unlock()
+
+			// PERFORM AGGRESSIVE PRUNING HEURISTICS
+			finalDomains := make(map[string]struct{})
+			for d := range domainMap {
+				base := getBaseDomain(d)
+				if rootCounts[base] > 3 && !protectedRoots[base] {
+					if !wlMap["*."+base] { finalDomains["*."+base] = struct{}{} }
+					if !wlMap[base] { finalDomains[base] = struct{}{} }
+				} else {
+					if !wlMap[d] { finalDomains[d] = struct{}{} }
+				}
+			}
+
+			for d := range finalDomains {
+				compiledLines = append(compiledLines, fmt.Sprintf("%s %s", d, blockAction))
+			}
+			log.Printf("[RPZ Worker] Heuristic Deduction Complete: %d original records pruned to %d output rules.", len(domainMap), len(finalDomains))
 
 			// Write Whitelist explicit rules at bottom to guarantee parsing validity
 			for d := range wlMap {
@@ -878,6 +900,30 @@ func sanitizeDomain(domain string) string {
 	}
 
 	return domain
+}
+
+// Protected Root Domains (Sangat terbatas pada infrastruktur kritikal & pemerintahan)
+var protectedRoots = map[string]bool{
+	"google.com": true, "youtube.com": true, "facebook.com": true, "instagram.com": true,
+	"x.com": true, "twitter.com": true, "tiktok.com": true, "cloudflare.com": true,
+	"github.com": true, "amazon.com": true, "amazonaws.com": true,
+	"go.id": true, "ac.id": true, "co.id": true, "sch.id": true, "desa.id": true,
+}
+
+func getBaseDomain(domain string) string {
+	domain = strings.TrimPrefix(domain, "*.")
+	parts := strings.Split(domain, ".")
+	if len(parts) <= 2 {
+		return domain
+	}
+	last := parts[len(parts)-1]
+	secondLast := parts[len(parts)-2]
+	if len(last) == 2 && (secondLast == "co" || secondLast == "or" || secondLast == "ac" || secondLast == "go" || secondLast == "sch" || secondLast == "net" || secondLast == "web" || secondLast == "my" || secondLast == "desa") {
+		if len(parts) >= 3 {
+			return parts[len(parts)-3] + "." + secondLast + "." + last
+		}
+	}
+	return secondLast + "." + last
 }
 
 func GetTopAnalytics(c *fiber.Ctx) error {
