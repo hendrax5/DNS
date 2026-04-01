@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -775,8 +776,8 @@ func syncRPZWorker() {
 							domain = strings.ReplaceAll(domain, "https://", "")
 							domain = strings.Split(domain, "/")[0]
 							
-							// Ensure not whitelisted and valid format
-							if !wlMap[domain] && strings.Contains(domain, ".") && !strings.ContainsAny(domain, " _#/") {
+							// Ensure not whitelisted, valid format, and absolutely NOT an IP address!
+							if !wlMap[domain] && strings.Contains(domain, ".") && !strings.ContainsAny(domain, " _#/") && net.ParseIP(domain) == nil {
 								validCount++
 								compiledLines = append(compiledLines, fmt.Sprintf("%s %s", domain, blockAction))
 							}
