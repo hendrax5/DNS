@@ -40,8 +40,27 @@ if [ -f "/tmp/netshield.db.bak" ]; then
     echo "  -> Database berhasil dikembalikan."
 fi
 
-# 4. Melakukan Build Ulang Container Docker
-echo "[4/4] Membangun ulang dan menyalakan Node NetShield ..."
+# 4. Tuning Otomatis Sesuai Spesifikasi Server
+echo "[4/5] Menganalisa Spesifikasi Hardware untuk Auto-Tuning..."
+CORES=$(nproc 2>/dev/null || echo 2)
+RAM_MB=$(free -m | awk '/^Mem:/{print $2}' 2>/dev/null || echo 4096)
+
+if [ "$RAM_MB" -gt 30000 ]; then CACHE_ENTRIES=10000000
+elif [ "$RAM_MB" -gt 15000 ]; then CACHE_ENTRIES=5000000
+elif [ "$RAM_MB" -gt 7000 ]; then CACHE_ENTRIES=2500000
+elif [ "$RAM_MB" -gt 3000 ]; then CACHE_ENTRIES=1000000
+else CACHE_ENTRIES=500000
+fi
+
+echo "  -> Hardware: $CORES CPU Cores | ${RAM_MB}MB RAM"
+echo "  -> DNS Config: threads=$CORES, cache_entries=$CACHE_ENTRIES"
+
+sed -i "s/^threads=.*/threads=${CORES}/" pdns_config/recursor.conf
+sed -i "s/^max-cache-entries=.*/max-cache-entries=${CACHE_ENTRIES}/" pdns_config/recursor.conf
+sed -i "s/^max-packetcache-entries=.*/max-packetcache-entries=${CACHE_ENTRIES}/" pdns_config/recursor.conf
+
+# 5. Melakukan Build Ulang Container Docker
+echo "[5/5] Membangun ulang dan menyalakan Node NetShield..."
 if command -v docker-compose &> /dev/null; then
     DOCKER_CMD="docker-compose"
 else
