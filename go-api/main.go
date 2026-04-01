@@ -742,8 +742,8 @@ func syncRPZWorker() {
 			var blStr string
 			db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&blStr)
 			for _, d := range strings.Split(blStr, "\n") {
-				d = strings.TrimSpace(d)
-				if d != "" && !wlMap[d] && strings.Contains(d, ".") {
+				d = sanitizeDomain(d)
+				if d != "" && !wlMap[d] && strings.Contains(d, ".") && !strings.ContainsAny(d, " _#/") && net.ParseIP(d) == nil {
 					compiledLines = append(compiledLines, fmt.Sprintf("%s %s", d, blockAction))
 				}
 			}
@@ -794,10 +794,9 @@ func syncRPZWorker() {
 						}
 
 						if domain != "" && domain != "localhost" && domain != "local" {
-							domain = strings.ReplaceAll(domain, "http://", "")
-							domain = strings.ReplaceAll(domain, "https://", "")
-							domain = strings.Split(domain, "/")[0]
+							domain = sanitizeDomain(domain)
 							
+
 							// Ensure not whitelisted, valid format, and absolutely NOT an IP address!
 							if !wlMap[domain] && strings.Contains(domain, ".") && !strings.ContainsAny(domain, " _#/") && net.ParseIP(domain) == nil {
 								validCount++
@@ -858,6 +857,23 @@ func syncRPZWorker() {
 			// Instantly wakeup and run sync!
 		}
 	}
+}
+
+func sanitizeDomain(domain string) string {
+	domain = strings.TrimSpace(domain)
+	domain = strings.ReplaceAll(domain, "http://", "")
+	domain = strings.ReplaceAll(domain, "https://", "")
+	domain = strings.Split(domain, "/")[0]
+
+	// Strictly repair faulty wildcard records from Government Feeds / Mistypes
+	for strings.Contains(domain, "**") {
+		domain = strings.ReplaceAll(domain, "**", "*")
+	}
+	if strings.HasPrefix(domain, "*") && !strings.HasPrefix(domain, "*.") {
+		domain = strings.Replace(domain, "*", "*.", 1)
+	}
+
+	return domain
 }
 
 func GetTopAnalytics(c *fiber.Ctx) error {
