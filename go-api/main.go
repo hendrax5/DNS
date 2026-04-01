@@ -18,7 +18,7 @@ import (
 	"time"
 	"runtime"
 
-	"github.com/gofiber/contrib/websocket"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -92,11 +92,10 @@ var (
 	feedMutex    sync.RWMutex
 	forceSync    = make(chan bool, 1)
 
-	wsClients    = make(map[*websocket.Conn]bool)
-	clientMutex  sync.Mutex
-	topClients   = make(map[string]*ClientStat)
-	topDomains   = make(map[string]int)
-	metricsMutex sync.RWMutex
+	topClients        = make(map[string]*ClientStat)
+	topAllowedDomains = make(map[string]int)
+	topBlockedDomains = make(map[string]int)
+	metricsMutex      sync.RWMutex
 )
 
 func main() {
@@ -121,6 +120,7 @@ func main() {
 	api.Get("/stats", GetPDNSStats)
     api.Get("/top-analytics", GetTopAnalytics)
     api.Get("/check-domain", CheckDomainBlock)
+	api.Get("/dig-health", GetDigHealth)
 
 	// Auth Middleware
 	authGuard := func(c *fiber.Ctx) error {
@@ -163,34 +163,11 @@ func main() {
 	admin.Get("/advanced-config", GetAdvancedConfig)
 	admin.Post("/advanced-config", SaveAdvancedConfig)
 
-	// WebSocket handler
-	app.Use("/ws", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
-
-	app.Get("/ws", websocket.New(func(c *websocket.Conn) {
-		clientMutex.Lock()
-		wsClients[c] = true
-		clientMutex.Unlock()
-
-		defer func() {
-			clientMutex.Lock()
-			delete(wsClients, c)
-			clientMutex.Unlock()
-			c.Close()
-		}()
-
-		for {
-			if _, _, err := c.ReadMessage(); err != nil {
-				break
-			}
-		}
-	}))
+	admin.Get("/dig-targets", GetDigTargets)
+	admin.Post("/dig-targets", SaveDigTargets)
 
 	// Serve Static Frontend
+
 	app.Static("/", "/var/www/html/")
 
 	log.Println("Server listening on :80")
@@ -942,26 +919,20 @@ func GetTopAnalytics(c *fiber.Ctx) error {
 	for k, v := range topClients {
 		clients = append(clients, Stat{Name: k, Count: v.Allow + v.Block, Allow: v.Allow, Block: v.Block})
 	}
-	var domains []Stat
-	for k, v := range topDomains {
-		domains = append(domains, Stat{Name: k, Count: v})
+	var allowedDomains []Stat
+	for k, v := range topAllowedDomains {
+		allowedDomains = append(allowedDomains, Stat{Name: k, Count: v})
+	}
+	var blockedDomains []Stat
+	for k, v := range topBlockedDomains {
+		blockedDomains = append(blockedDomains, Stat{Name: k, Count: v})
 	}
 
 	return c.JSON(fiber.Map{
-		"top_clients": clients,
-		"top_domains": domains,
+		"top_clients":         clients,
+		"top_allowed_domains": allowedDomains,
+		"top_blocked_domains": blockedDomains,
 	})
-}
-
-func broadcastWS(msg []byte) {
-	clientMutex.Lock()
-	defer clientMutex.Unlock()
-	for client := range wsClients {
-		if err := client.WriteMessage(websocket.TextMessage, msg); err != nil {
-			client.Close()
-			delete(wsClients, client)
-		}
-	}
 }
 
 func streamLogs() {
@@ -997,9 +968,6 @@ func streamLogs() {
 			continue
 		}
 
-		// Broadcast immediately to WebSockets
-		broadcastWS([]byte(line))
-
 		// Parse for Analytics
 		var entry map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &entry); err == nil {
@@ -1020,11 +988,85 @@ func streamLogs() {
 				}
 			}
 			if domain, ok := entry["qname"].(string); ok {
-				topDomains[domain]++
+				if action == "ALLOW" {
+					topAllowedDomains[domain]++
+				} else {
+					topBlockedDomains[domain]++
+				}
 			}
 			metricsMutex.Unlock()
 		}
 	}
+}
+
+type DigTarget struct {
+	Domain string `json:"domain"`
+}
+
+func GetDigTargets(c *fiber.Ctx) error {
+	var val string
+	err := db.QueryRow("SELECT value FROM settings WHERE key = 'dig_targets'").Scan(&val)
+	if err != nil || val == "" {
+		val = `[{"domain":"google.com"},{"domain":"bankmandiri.co.id"},{"domain":"1.1.1.1"}]`
+	}
+	var targets []DigTarget
+	json.Unmarshal([]byte(val), &targets)
+	return c.JSON(fiber.Map{"targets": targets})
+}
+
+func SaveDigTargets(c *fiber.Ctx) error {
+	var req struct {
+		Targets []DigTarget `json:"targets"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request"})
+	}
+	b, _ := json.Marshal(req.Targets)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'dig_targets'", string(b))
+	return c.JSON(fiber.Map{"message": "Dig targets saved"})
+}
+
+func GetDigHealth(c *fiber.Ctx) error {
+	var val string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'dig_targets'").Scan(&val)
+	if val == "" {
+		val = `[{"domain":"google.com"},{"domain":"bankmandiri.co.id"},{"domain":"1.1.1.1"}]`
+	}
+	var targets []DigTarget
+	json.Unmarshal([]byte(val), &targets)
+
+	type HealthResult struct {
+		Domain  string `json:"domain"`
+		Latency int    `json:"latency"`
+		Status  string `json:"status"` // "OK" or "TIMEOUT"
+	}
+
+	results := make([]HealthResult, 0)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	// We ping each target concurrently respecting 1.5s timeout manually
+	for _, t := range targets {
+		if t.Domain == "" { continue }
+		wg.Add(1)
+		go func(domain string) {
+			defer wg.Done()
+			start := time.Now()
+			// Basic DNS resolve locally. We assume local resolver manages to ping it.
+			_, err := net.LookupHost(domain)
+			latency := int(time.Since(start).Milliseconds())
+			status := "OK"
+			if err != nil || latency > 2000 {
+				status = "TIMEOUT"
+			}
+			mu.Lock()
+			results = append(results, HealthResult{Domain: domain, Latency: latency, Status: status})
+			mu.Unlock()
+		}(t.Domain)
+	}
+
+	wg.Wait()
+	return c.JSON(fiber.Map{"health": results})
 }
 
 func GetCustomLists(c *fiber.Ctx) error {

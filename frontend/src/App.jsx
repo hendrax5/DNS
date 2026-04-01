@@ -88,8 +88,9 @@ function App() {
   const [domainForwarders, setDomainForwarders] = useState('');
   const [parentResolvers, setParentResolvers] = useState(['', '', '', '', '', '']);
   const [saveStatus, setSaveStatus] = useState({ show: false, message: '', type: '' });
-  const [liveLogs, setLiveLogs] = useState([]);
-  const [topAnalytics, setTopAnalytics] = useState({ clients: [], domains: [] });
+  const [topAnalytics, setTopAnalytics] = useState({ clients: [], allowed: [], blocked: [] });
+  const [digHealth, setDigHealth] = useState([]);
+  const [digTargetsText, setDigTargetsText] = useState("");
 
   // Advanced Config
   const [safeSearch, setSafeSearch] = useState(false);
@@ -115,32 +116,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${wsProto}//${window.location.host}/ws`);
-    ws.onmessage = (event) => {
-      try {
-        const log = JSON.parse(event.data);
-        setLiveLogs(prev => [log, ...prev].slice(0, 50));
-      } catch (e) {}
-    };
-    return () => ws.close();
-  }, []);
-
-  useEffect(() => {
     if (activeTab === 'dashboard') {
       const fetchTop = async () => {
         try {
           const res = await fetch('/api/top-analytics');
           const data = await res.json();
           setTopAnalytics({
-            clients: (data.top_clients || []).sort((a,b)=>b.count-a.count).slice(0, 5),
-            domains: (data.top_domains || []).sort((a,b)=>b.count-a.count).slice(0, 5)
+            clients: (data.top_clients || []).sort((a,b)=>(b.allow+b.block)-(a.allow+a.block)).slice(0, 5),
+            allowed: (data.top_allowed_domains || []).sort((a,b)=>b.count-a.count).slice(0, 5),
+            blocked: (data.top_blocked_domains || []).sort((a,b)=>b.count-a.count).slice(0, 10)
           });
         } catch(e) {}
       };
+      
+      const fetchDigHealth = async () => {
+          try {
+              const res = await fetch('/api/dig-health');
+              const data = await res.json();
+              if(data.health) {
+                  setDigHealth(data.health);
+              }
+          } catch(e) {}
+      }
+
       fetchTop();
+      fetchDigHealth();
       const iv = setInterval(fetchTop, 5000);
-      return () => clearInterval(iv);
+      const ivDig = setInterval(fetchDigHealth, 3000);
+      return () => { clearInterval(iv); clearInterval(ivDig); }
     }
   }, [activeTab]);
 
@@ -177,6 +180,12 @@ function App() {
       const dataAdv = await resAdv.json();
       if(dataAdv.safesearch !== undefined) setSafeSearch(dataAdv.safesearch);
       if(dataAdv.dnssec !== undefined) setDnssec(dataAdv.dnssec);
+
+      const resDig = await apiFetch('/api/dig-targets');
+      const dataDig = await resDig.json();
+      if(dataDig.targets) {
+          setDigTargetsText(dataDig.targets.map(t=>t.domain).join('\n'));
+      }
     } catch(e) { console.error(e) }
   };
 
@@ -222,7 +231,15 @@ function App() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({safesearch: safeSearch, dnssec})
       });
-      showNotification('Advanced Security Settings Applied!');
+
+      const ips = digTargetsText.split('\n').map(d=>d.trim()).filter(d=>d);
+      await apiFetch('/api/dig-targets', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({targets: ips.map(domain => ({domain}))})
+      });
+
+      showNotification('Advanced Security Settings & Dig Targets Applied!');
     } catch(e) { showNotification('Failed to save settings', 'error'); }
   };
 
@@ -571,56 +588,91 @@ function App() {
               </div>
             </div>
 
-            {/* Live Intelligence Stream */}
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl mt-6">
-              <h3 className="text-lg font-semibold flex items-center gap-2 text-slate-200 mb-4">
-                <Activity className="w-5 h-5 text-emerald-400" /> Pemantauan Kueri Langsung (Live Stream)
-              </h3>
-              <div className="bg-slate-950 font-mono text-xs rounded-lg p-4 h-64 overflow-y-auto border border-slate-800">
-                {liveLogs.length === 0 ? (
-                  <span className="text-slate-500">Menunggu kueri masuk...</span>
-                ) : (
-                  liveLogs.map((log, i) => (
-                    <div key={i} className="flex gap-4 py-1.5 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/20 items-center">
-                      <span className="text-slate-500 w-20">{log.time ? new Date(log.time * 1000).toLocaleTimeString() : '--:--:--'}</span>
-                      <span className={`w-20 font-semibold ${log.action === 'ALLOW' ? 'text-emerald-500' : (log.action === 'DROP_ACL' ? 'text-rose-500' : 'text-orange-500')}`}>{log.action}</span>
-                      <span className="text-blue-400 w-32 truncate">{log.ip}</span>
-                      <span className="text-slate-300 flex-1 truncate">{log.qname}</span>
-                      <span className="text-slate-500 w-12 text-right">IN {log.type}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Top Analytics */}
+            {/* Custom Dig Monitor */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Wawasan Klien Teratas (Top Clients)</h3>
+               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col h-full shadow-lg">
+                 <h3 className="text-sm font-semibold text-slate-400 mb-1 uppercase tracking-wider flex items-center gap-2">
+                   <Activity className="w-4 h-4 text-rose-500" />
+                   Pemantauan Akses Siber (Top Blocked)
+                 </h3>
+                 <p className="text-xs text-slate-500 mb-4">Situs terlarang yang paling sering dicoba diakses oleh jaringan Anda hari ini.</p>
+                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                   {topAnalytics.blocked.map((d, i) => (
+                     <div key={i} className="flex justify-between items-center px-4 py-2.5 bg-[#0b1120] rounded-lg border border-slate-800/80 shadow-inner group hover:border-slate-700 transition">
+                       <span className="text-rose-100 font-medium text-sm truncate pr-2 flex items-center gap-3">
+                         <span className="w-6 text-center text-xs font-bold text-slate-500 bg-slate-800 rounded px-1.5 py-0.5">{i+1}</span>
+                         {d.name}
+                       </span>
+                       <span className="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded text-xs border border-rose-500/20 shadow-[0_0_10px_rgba(225,29,72,0.1)]">{d.count.toLocaleString()} x</span>
+                     </div>
+                   ))}
+                   {topAnalytics.blocked.length === 0 && <span className="text-slate-500 text-sm">Belum ada blokir sejauh ini.</span>}
+                 </div>
+
+                 {/* Top Offenders (IP Terbandel) */}
+                 <h3 className="text-sm font-semibold text-slate-400 mt-8 mb-1 uppercase tracking-wider flex items-center gap-2">
+                   <ShieldBan className="w-4 h-4 text-orange-500" />
+                   Top Policy Offenders (IP Terbandel)
+                 </h3>
+                 <p className="text-xs text-slate-500 mb-4">Alamat IP perangkat dengan probabilitas pelanggaran akses tertinggi.</p>
                  <div className="space-y-3">
                    {topAnalytics.clients.map((c, i) => (
-                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-slate-950 rounded-lg border border-slate-800/50">
-                       <span className="text-blue-400 text-sm font-mono flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{c.name}</span>
-                       <div className="flex gap-2 text-xs font-medium">
-                         <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{c.allow ? c.allow.toLocaleString() : 0} Diizinkan</span>
-                         <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">{c.block ? c.block.toLocaleString() : 0} Diblokir</span>
+                     <div key={i} className="flex justify-between items-center px-4 py-3 bg-[#0b1120] hover:bg-slate-800/30 rounded-lg border border-slate-800/80 transition-colors">
+                       <span className="text-blue-200 text-sm font-bold font-mono tracking-widest">{c.name}</span>
+                       <div className="flex flex-col items-end gap-1">
+                          <div className="flex gap-2 text-xs font-semibold">
+                            <span className="text-rose-400">{c.block ? c.block.toLocaleString() : 0} Blok</span>
+                          </div>
                        </div>
                      </div>
                    ))}
                    {topAnalytics.clients.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
                  </div>
                </div>
-               
-               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Domain Terbanyak Diakses</h3>
-                 <div className="space-y-3">
-                   {topAnalytics.domains.map((d, i) => (
-                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-slate-950 rounded-lg border border-slate-800/50">
-                       <span className="text-slate-300 text-sm truncate pr-2 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div>{d.name}</span>
+
+               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col h-full shadow-lg">
+                 <h3 className="text-sm font-semibold text-slate-400 mb-1 uppercase tracking-wider flex items-center gap-2">
+                   <Globe className="w-4 h-4 text-indigo-400" />
+                   Custom Target Dig Monitor 
+                 </h3>
+                 <p className="text-xs text-slate-500 mb-6">Analisis presisi latensi resolusi DNS tegar dari Engine PowerDNS lokal ke domain krusial Anda secara realtime.</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {digHealth.map((d, i) => (
+                         <div key={i} className="flex flex-col bg-[#0b1120] border border-slate-800 p-4 rounded-xl shadow-inner relative overflow-hidden group hover:border-slate-700 transition">
+                             <div className={`absolute top-0 right-0 w-16 h-16 blur-3xl opacity-20 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                             <span className="text-xs text-slate-400 mb-1 truncate">{d.domain}</span>
+                             <div className="flex items-end gap-2">
+                                <span className={`text-3xl font-bold font-mono tracking-tight ${d.status === 'OK' ? 'text-white' : 'text-rose-400'}`}>
+                                    {d.status === 'OK' ? d.latency : 'ERR'}
+                                </span>
+                                <span className="text-slate-500 text-sm font-semibold mb-1">ms</span>
+                             </div>
+                             <div className="mt-3 flex items-center gap-1.5">
+                                 <span className="relative flex h-2 w-2">
+                                    <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${d.status === 'OK' ? 'animate-ping bg-emerald-400' : 'bg-rose-500'}`}></span>
+                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                 </span>
+                                 <span className={`text-[10px] font-bold tracking-wider uppercase ${d.status === 'OK' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                     {d.status === 'OK' ? 'RESOLVED' : 'TIMEOUT'}
+                                 </span>
+                             </div>
+                         </div>
+                     ))}
+                     {digHealth.length === 0 && <span className="text-slate-500 text-sm italic col-span-2 text-center p-6 border border-dashed border-slate-800 rounded-lg">Target monitor belum diset oleh Admin.</span>}
+                 </div>
+                 
+                 <h3 className="text-sm font-semibold text-slate-400 mt-8 mb-1 uppercase tracking-wider flex items-center gap-2">
+                   <Server className="w-4 h-4 text-emerald-500" />
+                   Aktivitas Domain Sah 
+                 </h3>
+                 <div className="space-y-3 mt-4">
+                   {topAnalytics.allowed.map((d, i) => (
+                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-slate-800/40">
+                       <span className="text-slate-300 text-sm truncate pr-2 flex items-center gap-2 text-blue-100"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{d.name}</span>
                        <span className="text-slate-400 font-medium text-sm">{d.count.toLocaleString()}</span>
                      </div>
                    ))}
-                   {topAnalytics.domains.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
+                   {topAnalytics.allowed.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
                  </div>
                </div>
             </div>
@@ -1290,6 +1342,22 @@ function App() {
                       <div>
                         <label htmlFor="dnssec" className="text-white font-semibold cursor-pointer text-base">Validasi Strict DNSSEC</label>
                         <p className="text-slate-400 text-sm mt-1 leading-relaxed">Aktifkan validasi tanda tangan kriptografi tegar (zona BOGUS akan dibuang/drop). Peringatan: Akses diblokir seketika jika sertifikat otentikasi domain kedaluwarsa.</p>
+                      </div>
+                    </div>
+                    {/* Custom Dig Monitor Settings */}
+                    <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-800/50 bg-[#0b1120]">
+                      <div className="pt-1">
+                          <Activity className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <div className="w-full">
+                        <label className="text-white font-semibold text-base mb-1 block">Custom Dig Targets</label>
+                        <p className="text-slate-400 text-sm mt-1 mb-3 leading-relaxed">Masukkan domain yang ingin dipantau performa DNS resolusinya di Dasbor secara Real-Time. (Termasuk Ping Upstream Google). Pisahkan dengan enter (baris baru).</p>
+                        <textarea
+                          value={digTargetsText}
+                          onChange={(e) => setDigTargetsText(e.target.value)}
+                          className="w-full h-32 bg-slate-900/50 border border-slate-700/50 rounded-lg p-3 text-sm font-mono text-slate-300 resize-none focus:outline-none focus:border-indigo-500"
+                          placeholder="google.com&#10;8.8.8.8&#10;server-kantor.id"
+                        ></textarea>
                       </div>
                     </div>
                   </div>
