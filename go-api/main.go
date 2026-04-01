@@ -266,6 +266,8 @@ func generateACLConfig() {
 	if err == nil {
 		ioutil.WriteFile("/etc/powerdns/allowed_ips.txt", []byte(ipsStr), 0644)
 	}
+	exec.Command("rec_control", "reload-lua-script").Run()
+	exec.Command("rec_control", "wipe-cache", "$").Run()
 }
 
 func generateForwardersConfig() {
@@ -447,8 +449,6 @@ func SaveACL(c *fiber.Ctx) error {
 	}
 
 	generateACLConfig()
-	exec.Command("rec_control", "reload-lua-script").Run()
-	exec.Command("rec_control", "wipe-cache", "$").Run()
 
 	return c.JSON(fiber.Map{"message": "ACL updated successfully", "ips": req.IPs})
 }
