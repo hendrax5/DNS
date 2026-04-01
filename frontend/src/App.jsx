@@ -17,7 +17,10 @@ import {
   LogOut,
   Database,
   KeyRound,
-  LockOpen
+  LockOpen,
+  Plus,
+  Trash2,
+  ShieldBan
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -983,85 +986,185 @@ function App() {
                   </div>
 
               {/* Custom Whitelist & Blacklist Arrays */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-2">
+              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-2 shadow-xl">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/20">
                   <div>
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                      <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                      Pengecualian Aturan Khusus
+                      <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                      Pengecualian Aturan Khusus (Bypass)
                     </h2>
-                    <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                      Masukkan domain ke Daftar Diizinkan (Whitelist) untuk melewati blokir RPZ, atau masukkan ke Daftar Blokir (Blacklist) untuk memaksa pemblokiran. 
+                    <p className="text-slate-400 text-sm mt-2 leading-relaxed max-w-2xl">
+                      Berikan intervensi manual pada rute penyelesaian DNS. Domain pada <strong className="text-emerald-400 font-semibold">Daftar Diizinkan</strong> terbebas dari seluruh blokir, sementara <strong className="text-rose-400 font-semibold">Daftar Blokir</strong> akan ditolak seketika secara absolut (NXDOMAIN). 
                     </p>
                   </div>
                   <button 
                     onClick={saveCustomLists}
-                    className="px-8 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all duration-200 cursor-pointer flex items-center gap-2"
+                    className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all duration-300 cursor-pointer flex items-center gap-3 transform hover:scale-105"
                   >
-                    Kompilasi Daftar Kustom
+                    <RefreshCw className="w-4 h-4" /> Kompilasi Aturan Kustom
                   </button>
                 </div>
                 
-                <div className="p-6 bg-slate-950/50 flex flex-col lg:flex-row gap-10 flex-1">
+                <div className="p-0 bg-slate-950/30 flex flex-col xl:flex-row flex-1">
                   
-                  {/* Whitelist Panel */}
-                  <div className="flex-1 flex flex-col gap-4">
-                     <label className="block text-sm font-bold text-emerald-400 tracking-widest uppercase flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" /> Daftar Diizinkan (Whitelist)
-                     </label>
-                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Bebas dari semua blokir RPZ dan Master Feeds.</p>
-                     
-                     <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-2">
-                        {customWhitelist.map((domain, i) => (
-                           <div key={i} className="flex items-center gap-2 bg-[#0b1120] border border-emerald-900/30 p-2 rounded-lg">
-                              <input 
-                                 type="text" 
-                                 value={domain}
-                                 onChange={e => {
-                                    const next = [...customWhitelist];
-                                    next[i] = e.target.value;
-                                    setCustomWhitelist(next);
-                                 }}
-                                 placeholder="misal. situs-aman.com"
-                                 className="flex-1 bg-transparent text-emerald-100 font-mono text-sm px-2 focus:outline-none placeholder:text-emerald-900/50"
-                              />
-                              <button onClick={() => setCustomWhitelist(customWhitelist.filter((_, idx)=>idx!==i))} className="text-emerald-700 hover:text-red-400 p-1">✕</button>
-                           </div>
-                        ))}
+                  {/* ====== WHITELIST PANEL ====== */}
+                  <div className="flex-1 flex flex-col border-b xl:border-b-0 xl:border-r border-slate-800/80">
+                     <div className="p-6 bg-emerald-900/10 border-b border-emerald-900/20 flex justify-between items-center">
+                       <div>
+                         <label className="block text-sm font-bold text-emerald-400 tracking-widest uppercase flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5" /> Daftar Diizinkan (Whitelist)
+                         </label>
+                         <p className="text-xs text-slate-500 mt-1">Total {customWhitelist.length} domain dikecualikan.</p>
+                       </div>
+                       <div className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/20">
+                         ALLOW
+                       </div>
                      </div>
-                     <button onClick={() => setCustomWhitelist([...customWhitelist, ''])} className="mt-2 py-2 text-xs font-bold text-emerald-500/70 border border-dashed border-emerald-800/50 rounded hover:bg-emerald-900/20 transition-colors">
-                        + Pasang Domain Whitelist
-                     </button>
+                     
+                     <div className="p-6 flex-1 flex flex-col gap-4">
+                       <div className="flex gap-2">
+                         <div className="relative flex-1">
+                           <Globe className="w-4 h-4 absolute left-3 top-3 text-emerald-500/50" />
+                           <input 
+                              type="text" 
+                              id="inputWhitelistAdd"
+                              onKeyDown={e => {
+                                if(e.key === 'Enter') {
+                                  const val = e.target.value.trim();
+                                  if(!val) return;
+                                  if(!customWhitelist.includes(val)) setCustomWhitelist([val, ...customWhitelist]);
+                                  e.target.value = '';
+                                }
+                              }}
+                              placeholder="Tambah domain (tekan enter)..."
+                              className="w-full bg-[#0b1120] border border-emerald-900/50 rounded-lg pl-10 pr-4 py-2.5 text-sm font-mono text-emerald-100 focus:outline-none focus:border-emerald-500/50 transition-colors shadow-inner placeholder:text-slate-600"
+                           />
+                         </div>
+                         <button 
+                            onClick={() => {
+                              const input = document.getElementById('inputWhitelistAdd');
+                              const val = input.value.trim();
+                              if(!val) return;
+                              if(!customWhitelist.includes(val)) setCustomWhitelist([val, ...customWhitelist]);
+                              input.value = '';
+                            }}
+                            className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 p-2.5 rounded-lg border border-emerald-500/30 transition-colors cursor-pointer flex-shrink-0"
+                         >
+                           <Plus className="w-5 h-5" />
+                         </button>
+                       </div>
+
+                       <div className="flex flex-col gap-2 max-h-96 min-h-[12rem] overflow-y-auto pr-2 custom-scrollbar">
+                          {customWhitelist.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center py-10 border border-dashed border-emerald-900/50 rounded-xl bg-emerald-900/5">
+                              <CheckCircle2 className="w-8 h-8 text-emerald-700/50 mx-auto mb-3" />
+                              <p className="text-sm font-medium text-emerald-600/70">Daftar masih kosong</p>
+                              <p className="text-xs text-slate-600 mt-1">Gunakan kotak input di atas</p>
+                            </div>
+                          ) : (
+                            customWhitelist.map((domain, i) => (
+                               <div key={i} className="flex justify-between items-center group bg-[#0b1120] border border-emerald-900/20 p-3 rounded-xl hover:border-emerald-500/40 transition-all hover:shadow-lg hover:shadow-emerald-900/20">
+                                  <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></div>
+                                     <input 
+                                        type="text" 
+                                        value={domain}
+                                        onChange={e => {
+                                           const next = [...customWhitelist];
+                                           next[i] = e.target.value;
+                                           setCustomWhitelist(next);
+                                        }}
+                                        className="bg-transparent text-emerald-50 font-mono text-sm focus:outline-none w-full truncate"
+                                     />
+                                  </div>
+                                  <button onClick={() => setCustomWhitelist(customWhitelist.filter((_, idx)=>idx!==i))} className="text-slate-600 hover:text-rose-400 p-2 rounded-lg hover:bg-rose-500/10 cursor-pointer transition-colors opacity-50 group-hover:opacity-100 flex-shrink-0">
+                                     <Trash2 className="w-4 h-4" />
+                                  </button>
+                               </div>
+                            ))
+                          )}
+                       </div>
+                     </div>
                   </div>
 
-                  {/* Blacklist Panel */}
-                  <div className="flex-1 flex flex-col gap-4 border-t pt-6 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-10 border-slate-800">
-                     <label className="block text-sm font-bold text-red-500 tracking-widest uppercase flex items-center gap-2">
-                        <ShieldAlert className="w-4 h-4" /> Daftar Blokir (Blacklist)
-                     </label>
-                     <p className="text-xs text-slate-500 mb-2 leading-relaxed">Domain ini akan langsung diblokir secara mutlak.</p>
-
-                     <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-2">
-                        {customBlacklist.map((domain, i) => (
-                           <div key={i} className="flex items-center gap-2 bg-[#0b1120] border border-red-900/30 p-2 rounded-lg">
-                              <input 
-                                 type="text" 
-                                 value={domain}
-                                 onChange={e => {
-                                    const next = [...customBlacklist];
-                                    next[i] = e.target.value;
-                                    setCustomBlacklist(next);
-                                 }}
-                                 placeholder="e.g. bad-site.com"
-                                 className="flex-1 bg-transparent text-red-100 font-mono text-sm px-2 focus:outline-none placeholder:text-red-900/50"
-                              />
-                              <button onClick={() => setCustomBlacklist(customBlacklist.filter((_, idx)=>idx!==i))} className="text-red-700 hover:text-red-400 p-1">✕</button>
-                           </div>
-                        ))}
+                  {/* ====== BLACKLIST PANEL ====== */}
+                  <div className="flex-1 flex flex-col">
+                     <div className="p-6 bg-rose-900/10 border-b border-rose-900/20 flex justify-between items-center">
+                       <div>
+                         <label className="block text-sm font-bold text-rose-500 tracking-widest uppercase flex items-center gap-2">
+                            <ShieldBan className="w-5 h-5" /> Daftar Blokir (Blacklist)
+                         </label>
+                         <p className="text-xs text-slate-500 mt-1">Total {customBlacklist.length} domain dicekal mutlak.</p>
+                       </div>
+                       <div className="bg-rose-500/10 text-rose-400 px-3 py-1 rounded-full text-xs font-bold border border-rose-500/20">
+                         DROP / NXDOMAIN
+                       </div>
                      </div>
-                     <button onClick={() => setCustomBlacklist([...customBlacklist, ''])} className="mt-2 py-2 text-xs font-bold text-red-500/70 border border-dashed border-red-800/50 rounded hover:bg-red-900/20 transition-colors">
-                        + Pasang Domain Blocklist
-                     </button>
+                     
+                     <div className="p-6 flex-1 flex flex-col gap-4">
+                       <div className="flex gap-2">
+                         <div className="relative flex-1">
+                           <Globe className="w-4 h-4 absolute left-3 top-3 text-rose-500/50" />
+                           <input 
+                              type="text" 
+                              id="inputBlacklistAdd"
+                              onKeyDown={e => {
+                                if(e.key === 'Enter') {
+                                  const val = e.target.value.trim();
+                                  if(!val) return;
+                                  if(!customBlacklist.includes(val)) setCustomBlacklist([val, ...customBlacklist]);
+                                  e.target.value = '';
+                                }
+                              }}
+                              placeholder="Tambah blokir (tekan enter)..."
+                              className="w-full bg-[#0b1120] border border-rose-900/50 rounded-lg pl-10 pr-4 py-2.5 text-sm font-mono text-rose-100 focus:outline-none focus:border-rose-500/50 transition-colors shadow-inner placeholder:text-slate-600"
+                           />
+                         </div>
+                         <button 
+                            onClick={() => {
+                              const input = document.getElementById('inputBlacklistAdd');
+                              const val = input.value.trim();
+                              if(!val) return;
+                              if(!customBlacklist.includes(val)) setCustomBlacklist([val, ...customBlacklist]);
+                              input.value = '';
+                            }}
+                            className="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 p-2.5 rounded-lg border border-rose-500/30 transition-colors cursor-pointer flex-shrink-0"
+                         >
+                           <Plus className="w-5 h-5" />
+                         </button>
+                       </div>
+
+                       <div className="flex flex-col gap-2 max-h-96 min-h-[12rem] overflow-y-auto pr-2 custom-scrollbar">
+                          {customBlacklist.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center py-10 border border-dashed border-rose-900/50 rounded-xl bg-rose-900/5">
+                              <ShieldBan className="w-8 h-8 text-rose-800/50 mx-auto mb-3" />
+                              <p className="text-sm font-medium text-rose-600/70">Daftar blokir kosong</p>
+                              <p className="text-xs text-slate-600 mt-1">Domain yang dicekal akan tampil di sini</p>
+                            </div>
+                          ) : (
+                            customBlacklist.map((domain, i) => (
+                               <div key={i} className="flex justify-between items-center group bg-[#0b1120] border border-rose-900/20 p-3 rounded-xl hover:border-rose-500/40 transition-all hover:shadow-lg hover:shadow-rose-900/20">
+                                  <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                     <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse flex-shrink-0"></div>
+                                     <input 
+                                        type="text" 
+                                        value={domain}
+                                        onChange={e => {
+                                           const next = [...customBlacklist];
+                                           next[i] = e.target.value;
+                                           setCustomBlacklist(next);
+                                        }}
+                                        className="bg-transparent text-rose-50 font-mono text-sm focus:outline-none w-full truncate"
+                                     />
+                                  </div>
+                                  <button onClick={() => setCustomBlacklist(customBlacklist.filter((_, idx)=>idx!==i))} className="text-slate-600 hover:text-rose-400 p-2 rounded-lg hover:bg-rose-500/10 cursor-pointer transition-colors opacity-50 group-hover:opacity-100 flex-shrink-0">
+                                     <Trash2 className="w-4 h-4" />
+                                  </button>
+                               </div>
+                            ))
+                          )}
+                       </div>
+                     </div>
                   </div>
 
                 </div>
