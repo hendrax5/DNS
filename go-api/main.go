@@ -236,17 +236,16 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1440')`)
 	db.Exec(`UPDATE settings SET value = '1440' WHERE key = 'rpz_sync_interval' AND value = '1'`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
-	db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.kominfo.go.id/","enabled":true}]' WHERE key = 'rpz_feeds' AND value NOT LIKE '[%'`)
+	db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.komdigi.go.id/assets/db/domains_isp","enabled":true}]' WHERE key = 'rpz_feeds' AND value NOT LIKE '[%'`)
 
-	// Inject new komdigi default if absent
+	// Inject new komdigi default and remove legacy kominfo feeds from DB
 	var rpzValue string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_feeds'").Scan(&rpzValue)
-	if !strings.Contains(rpzValue, "trustpositif.komdigi.go.id/assets/db/domains") {
-		var feeds []RPZFeed
-		json.Unmarshal([]byte(rpzValue), &feeds)
-		feeds = append(feeds, RPZFeed{URL: "https://trustpositif.komdigi.go.id/assets/db/domains", Enabled: false})
-		newJSON, _ := json.Marshal(feeds)
-		db.Exec("UPDATE settings SET value = ? WHERE key = 'rpz_feeds'", string(newJSON))
+	if strings.Contains(rpzValue, "trustpositif.kominfo.go.id") || strings.Contains(rpzValue, "trustpositif.komdigi.go.id/assets/db/domains") {
+		// Enforce the new komdigi ISP domain list and clear others if it holds legacy
+		if !strings.Contains(rpzValue, "trustpositif.komdigi.go.id/assets/db/domains_isp") {
+			db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.komdigi.go.id/assets/db/domains_isp","enabled":true}]' WHERE key = 'rpz_feeds'`)
+		}
 	}
 
 	// ALWAYS securely regenerate PowerDNS Lua mappings on Startup!
@@ -1096,7 +1095,7 @@ func SaveDigTargets(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid request"})
 	}
 	b, _ := json.Marshal(req.Targets)
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'dig_targets'", string(b))
+	db.Exec(`INSERT INTO settings (key, value) VALUES ('dig_targets', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, string(b))
 	return c.JSON(fiber.Map{"message": "Dig targets saved"})
 }
 
