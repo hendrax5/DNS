@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 	"runtime"
+	"sort"
 
 
 	"github.com/gofiber/fiber/v2"
@@ -955,10 +956,9 @@ func getBaseDomain(domain string) string {
 }
 
 func GetTopAnalytics(c *fiber.Ctx) error {
-	metricsMutex.RLock()
-	defer metricsMutex.RUnlock()
+	metricsMutex.Lock()
+	defer metricsMutex.Unlock()
 
-	// Simplify map to limited array for frontend
 	type Stat struct {
 		Name  string `json:"name"`
 		Count int    `json:"count"`
@@ -966,23 +966,47 @@ func GetTopAnalytics(c *fiber.Ctx) error {
 		Block int    `json:"block,omitempty"`
 	}
 
-	var clients []Stat
+	clients := make([]Stat, 0, len(topClients))
 	for k, v := range topClients {
 		clients = append(clients, Stat{Name: k, Count: v.Allow + v.Block, Allow: v.Allow, Block: v.Block})
 	}
-	var allowedDomains []Stat
+	sort.Slice(clients, func(i, j int) bool { return clients[i].Count > clients[j].Count })
+	
+	allowed := make([]Stat, 0, len(topAllowedDomains))
 	for k, v := range topAllowedDomains {
-		allowedDomains = append(allowedDomains, Stat{Name: k, Count: v})
+		allowed = append(allowed, Stat{Name: k, Count: v})
 	}
-	var blockedDomains []Stat
+	sort.Slice(allowed, func(i, j int) bool { return allowed[i].Count > allowed[j].Count })
+
+	blocked := make([]Stat, 0, len(topBlockedDomains))
 	for k, v := range topBlockedDomains {
-		blockedDomains = append(blockedDomains, Stat{Name: k, Count: v})
+		blocked = append(blocked, Stat{Name: k, Count: v})
 	}
+	sort.Slice(blocked, func(i, j int) bool { return blocked[i].Count > blocked[j].Count })
+
+	// PRUNE maps if they get too large (prevent memory leak / CPU burn at high QPS)
+	if len(clients) > 1000 {
+		topClients = make(map[string]*ClientStat)
+		for _, c := range clients[:1000] { topClients[c.Name] = &ClientStat{Allow: c.Allow, Block: c.Block} }
+	}
+	if len(allowed) > 1000 {
+		topAllowedDomains = make(map[string]int)
+		for _, a := range allowed[:1000] { topAllowedDomains[a.Name] = a.Count }
+	}
+	if len(blocked) > 1000 {
+		topBlockedDomains = make(map[string]int)
+		for _, b := range blocked[:1000] { topBlockedDomains[b.Name] = b.Count }
+	}
+
+	// Slice for frontend fast rendering (Top 5 / 10)
+	if len(clients) > 5 { clients = clients[:5] }
+	if len(allowed) > 5 { allowed = allowed[:5] }
+	if len(blocked) > 10 { blocked = blocked[:10] }
 
 	return c.JSON(fiber.Map{
 		"top_clients":         clients,
-		"top_allowed_domains": allowedDomains,
-		"top_blocked_domains": blockedDomains,
+		"top_allowed_domains": allowed,
+		"top_blocked_domains": blocked,
 	})
 }
 
