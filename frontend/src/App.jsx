@@ -306,7 +306,10 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-7 h-7 text-emerald-500" />
-            <span className="text-xl font-bold tracking-tight text-white">NetShield<span className="text-slate-400 font-medium">Enterprise</span></span>
+            <div className="flex flex-col justify-center">
+              <span className="text-xl font-bold tracking-tight text-white leading-none">NetShield<span className="text-slate-400 font-medium">Enterprise</span></span>
+              <span className="text-[10px] text-emerald-400 font-semibold tracking-wide uppercase mt-0.5">supported by ServiceX</span>
+            </div>
           </div>
           
                     <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
@@ -393,7 +396,7 @@ function App() {
             <div className="flex justify-between items-end">
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight">System Telemetry</h1>
-                <p className="text-slate-400 text-sm mt-1">Real-time performance and threat intelligence monitoring.</p>
+                <p className="text-slate-400 text-sm mt-1">Real-time DNS performance and threat intelligence monitoring.</p>
               </div>
               <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-md border border-emerald-500/20">
                 <span className="relative flex h-2 w-2">

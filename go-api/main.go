@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"runtime"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -548,7 +549,7 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		uptime = metrics["uptime"]
 		if uptime > 0 {
 			qps = metrics["questions"] / uptime
-			cpu = (metrics["user-msec"] + metrics["sys-msec"]) / 10.0 / uptime
+			cpu = math.Min(100.0, ((metrics["user-msec"] + metrics["sys-msec"]) / 10.0 / uptime) / float64(runtime.NumCPU()))
 		}
 
 		latency = metrics["qa-latency"] / 1000.0 // ns or us to ms usually
