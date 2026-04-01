@@ -5,7 +5,10 @@ services:
     build: .
     container_name: netshield-v2
     restart: always
-    network_mode: "host"
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+      - "80:80/tcp"
     tmpfs:
       - /var/log
     ulimits:
