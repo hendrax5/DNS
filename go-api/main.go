@@ -1031,28 +1031,61 @@ func streamLogs() {
 	file.Seek(0, os.SEEK_END)
 	reader := bufio.NewReader(file)
 
+	localTopClientsAllow := make(map[string]int)
+	localTopClientsBlock := make(map[string]int)
+	localTopAllowedDomains := make(map[string]int)
+	localTopBlockedDomains := make(map[string]int)
+	localQueryTypeMap := make(map[string]int)
+	var localAlerts []TelemetryAlert
+	batchCount := 0
+
+	flushBatch := func() {
+		if batchCount == 0 { return }
+		metricsMutex.Lock()
+		for ip, count := range localTopClientsAllow {
+			if topClients[ip] == nil { topClients[ip] = &ClientStat{} }
+			topClients[ip].Allow += count
+		}
+		for ip, count := range localTopClientsBlock {
+			if topClients[ip] == nil { topClients[ip] = &ClientStat{} }
+			topClients[ip].Block += count
+		}
+		for dom, count := range localTopAllowedDomains { topAllowedDomains[dom] += count }
+		for dom, count := range localTopBlockedDomains { topBlockedDomains[dom] += count }
+		for qType, count := range localQueryTypeMap { queryTypeMap[qType] += count }
+		for _, alert := range localAlerts {
+			telemetryAlerts = append([]TelemetryAlert{alert}, telemetryAlerts...)
+			if len(telemetryAlerts) > 10 { telemetryAlerts = telemetryAlerts[:10] }
+		}
+		metricsMutex.Unlock()
+
+		// Reset local aggregate maps
+		localTopClientsAllow = make(map[string]int)
+		localTopClientsBlock = make(map[string]int)
+		localTopAllowedDomains = make(map[string]int)
+		localTopBlockedDomains = make(map[string]int)
+		localQueryTypeMap = make(map[string]int)
+		localAlerts = nil
+		batchCount = 0
+	}
+
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
+			flushBatch() // flush immediately on end-of-buffer wait
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
 		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
+		if line == "" { continue }
 
 		// Parse for Analytics
 		var entry map[string]interface{}
 		if err := json.Unmarshal([]byte(line), &entry); err == nil {
-			metricsMutex.Lock()
 			action := ""
-			if a, ok := entry["action"].(string); ok {
-				action = a
-			}
+			if a, ok := entry["action"].(string); ok { action = a }
 			
-			// Detect Query Types and Anomalies
 			var isAnomaly bool
 			var typeName string = "OTHER"
 			if qtype, ok := entry["type"].(float64); ok {
@@ -1065,20 +1098,24 @@ func streamLogs() {
 				case 255: typeName = "ANY"
 				}
 
-				if typeName == "ANY" || typeName == "TXT" {
-					isAnomaly = true
-				}
+				if typeName == "ANY" || typeName == "TXT" { isAnomaly = true }
 
 				ipStr, _ := entry["ip"].(string)
 				domainStr, _ := entry["qname"].(string)
 
 				if typeName == "ANY" {
-					msg := fmt.Sprintf("CRIT: POSSIBLE AMPLIFICATION ATTACK FROM %s (ANY Query)", ipStr)
-					addTelemetryAlert(msg, "CRIT")
+					localAlerts = append(localAlerts, TelemetryAlert{
+						Message: fmt.Sprintf("CRIT: POSSIBLE AMPLIFICATION ATTACK FROM %s (ANY Query)", ipStr),
+						Level:   "CRIT",
+						Time:    time.Now().Format("2006-01-02 15:04:05"),
+					})
 				}
 				if typeName == "TXT" && len(domainStr) > 60 {
-					msg := fmt.Sprintf("WARN: ABNORMAL TXT LENGTH (DNS Tunneling suspected). Domain: %s | Client: %s", domainStr, ipStr)
-					addTelemetryAlert(msg, "WARN")
+					localAlerts = append(localAlerts, TelemetryAlert{
+						Message: fmt.Sprintf("WARN: ABNORMAL TXT LENGTH (DNS Tunneling suspected). Domain: %s | Client: %s", domainStr, ipStr),
+						Level:   "WARN",
+						Time:    time.Now().Format("2006-01-02 15:04:05"),
+					})
 				}
 			}
 
@@ -1088,26 +1125,27 @@ func streamLogs() {
 				scaleFactor = 20
 			}
 
-			queryTypeMap[typeName] += scaleFactor
+			localQueryTypeMap[typeName] += scaleFactor
+			batchCount++
 
 			if ip, ok := entry["ip"].(string); ok {
-				if topClients[ip] == nil {
-					topClients[ip] = &ClientStat{}
-				}
 				if action == "ALLOW" {
-					topClients[ip].Allow += scaleFactor
+					localTopClientsAllow[ip] += scaleFactor
 				} else {
-					topClients[ip].Block += 1
+					localTopClientsBlock[ip] += 1
 				}
 			}
 			if domain, ok := entry["qname"].(string); ok {
 				if action == "ALLOW" {
-					topAllowedDomains[domain] += scaleFactor
+					localTopAllowedDomains[domain] += scaleFactor
 				} else {
-					topBlockedDomains[domain] += 1
+					localTopBlockedDomains[domain] += 1
 				}
 			}
-			metricsMutex.Unlock()
+
+			if batchCount >= 50 {
+				flushBatch()
+			}
 		}
 	}
 }
