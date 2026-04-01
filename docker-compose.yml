@@ -5,14 +5,12 @@ services:
     build: .
     container_name: netshield-v2
     restart: always
-    ports:
-      - "53:53/udp"
-      - "53:53/tcp"
-      - "80:80/tcp"
+    network_mode: "host"
+    tmpfs:
+      - /var/log
     ulimits:
       nofile:
         soft: 1048576
         hard: 1048576
     volumes:
       - ./data:/data
-    # network_mode: "host" # (Opsional) Uncomment baris ini untuk performa Bypass Docker NAT (Ultra-Fast UDP) namun perhatikan konflik Port 80 bawaan OS
