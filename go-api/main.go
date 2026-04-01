@@ -350,6 +350,7 @@ yandex.com CNAME yandex.com.
 
 	// Hot reload PowerDNS settings without rebooting the container
 	exec.Command("rec_control", "reload-lua-config").Run()
+	exec.Command("rec_control", "wipe-cache", "$").Run()
 }
 
 func LoginHandler(c *fiber.Ctx) error {
@@ -431,6 +432,7 @@ func SaveACL(c *fiber.Ctx) error {
 
 	generateACLConfig()
 	exec.Command("rec_control", "reload-lua-script").Run()
+	exec.Command("rec_control", "wipe-cache", "$").Run()
 
 	return c.JSON(fiber.Map{"message": "ACL updated successfully", "ips": req.IPs})
 }
@@ -650,6 +652,7 @@ func SaveForwarders(c *fiber.Ctx) error {
 
 	generateForwardersConfig()
 	exec.Command("rec_control", "reload-zones").Run()
+	exec.Command("rec_control", "wipe-cache", "$").Run()
 
 	return c.JSON(fiber.Map{"message": "Forwarders updated successfully"})
 }
@@ -801,6 +804,7 @@ func syncRPZWorker() {
 			if errWrite == nil {
 				// Signal PowerDNS to instantly reload latest compiled policies
 				exec.Command("rec_control", "reload-lua-config").Run()
+				exec.Command("rec_control", "wipe-cache", "$").Run()
 			}
 		}
 		
