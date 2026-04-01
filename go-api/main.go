@@ -865,12 +865,16 @@ func sanitizeDomain(domain string) string {
 	domain = strings.ReplaceAll(domain, "https://", "")
 	domain = strings.Split(domain, "/")[0]
 
-	// Strictly repair faulty wildcard records from Government Feeds / Mistypes
-	for strings.Contains(domain, "**") {
-		domain = strings.ReplaceAll(domain, "**", "*")
+	// Collapse leading asterisks into a clean wildcard *.
+	if strings.HasPrefix(domain, "*") {
+		cleanPrefix := strings.TrimLeft(domain, "*.")
+		domain = "*." + cleanPrefix
 	}
-	if strings.HasPrefix(domain, "*") && !strings.HasPrefix(domain, "*.") {
-		domain = strings.Replace(domain, "*", "*.", 1)
+
+	// Check for any remaining asterisks in the middle (censored domains like "p***.com")
+	// These are completely invalid for DNS RPZ and impossible to resolve
+	if strings.Contains(strings.TrimPrefix(domain, "*."), "*") {
+		return ""
 	}
 
 	return domain
