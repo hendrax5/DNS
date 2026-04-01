@@ -330,10 +330,10 @@ func generateLuaConfig() {
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
 			if lamanLabuhIP != "" {
-				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="%s"})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP)
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="%s", dumpFile="/etc/powerdns/axfr_%s.zone"})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP, f.ZoneName)
 			} else {
 				// Use Kominfo's default redirect if no local override
-				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s")`+"\n", f.MasterIP, f.ZoneName)
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {dumpFile="/etc/powerdns/axfr_%s.zone"})`+"\n", f.MasterIP, f.ZoneName, f.ZoneName)
 			}
 		}
 	}
@@ -504,14 +504,20 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		for _, f := range axfrFeeds {
 			statusStr := "Disconnected"
 			records := 0
+			syncTime := "Pending Sync"
 			if f.Enabled {
 				statusStr = "AXFR/IXFR Link"
-				// Fetch actual AXFR record count from PowerDNS memory dump
-				cmd := exec.Command("sh", "-c", fmt.Sprintf("rec_control dump-rpz %s /tmp/rpz_dump_%s >/dev/null 2>&1 && wc -l < /tmp/rpz_dump_%s", f.ZoneName, f.ZoneName, f.ZoneName))
-				out, _ := cmd.Output()
-				recCount, _ := strconv.Atoi(strings.TrimSpace(string(out)))
-				if recCount > 0 {
-					records = recCount - 7 // Output approx offsets include SOA/Header
+				dumpPath := fmt.Sprintf("/etc/powerdns/axfr_%s.zone", f.ZoneName)
+				if stat, err := os.Stat(dumpPath); err == nil {
+					syncTime = stat.ModTime().Format("15:04:05")
+					out, _ := exec.Command("wc", "-l", dumpPath).Output()
+					fields := strings.Fields(string(out))
+					if len(fields) > 0 {
+						recCount, _ := strconv.Atoi(fields[0])
+						if recCount > 0 {
+							records = recCount
+						}
+					}
 				}
 			}
 			currentStatus = append(currentStatus, FeedStatus{
@@ -520,7 +526,7 @@ func GetPDNSStats(c *fiber.Ctx) error {
 				Status:  statusStr,
 				Error:   "",
 				Records: records,
-				Time:    "Native DNS",
+				Time:    syncTime,
 			})
 		}
 	}
