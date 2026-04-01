@@ -100,6 +100,7 @@ var (
 	telemetryAlerts   []TelemetryAlert
 	historySeries     []TimeSeriesPoint
 	metricsMutex      sync.RWMutex
+	liveQPS           float64
 )
 
 type TelemetryAlert struct {
@@ -122,6 +123,7 @@ func main() {
 	go syncRPZWorker()
 	go streamLogs()
 	go systemTelemetryWorker()
+	go liveQPSWorker()
 
 	app := fiber.New(fiber.Config{
 		ServerHeader: "NetShield DNS",
@@ -548,9 +550,12 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		
 		uptime = metrics["uptime"]
 		if uptime > 0 {
-			qps = metrics["questions"] / uptime
 			cpu = math.Min(100.0, ((metrics["user-msec"] + metrics["sys-msec"]) / 10.0 / uptime) / float64(runtime.NumCPU()))
 		}
+		
+		metricsMutex.RLock()
+		qps = liveQPS
+		metricsMutex.RUnlock()
 
 		latency = metrics["qa-latency"] / 1000.0 // ns or us to ms usually
 		mem = metrics["real-memory-usage"] / 1024.0 / 1024.0 // bytes to MB
@@ -1242,6 +1247,28 @@ func addTelemetryAlert(msg, level string) {
 	}
 }
 
+func liveQPSWorker() {
+	ticker := time.NewTicker(3 * time.Second)
+	var lastCount float64
+	for range ticker.C {
+		out, err := exec.Command("rec_control", "get", "questions").Output()
+		if err == nil {
+			val, _ := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
+			if lastCount > 0 {
+				metricsMutex.Lock()
+				liveQPS = (val - lastCount) / 3.0
+				if liveQPS < 0 { liveQPS = 0 }
+				metricsMutex.Unlock()
+			} else {
+				metricsMutex.Lock()
+				liveQPS = 0
+				metricsMutex.Unlock()
+			}
+			lastCount = val
+		}
+	}
+}
+
 func systemTelemetryWorker() {
 	ticker := time.NewTicker(1 * time.Minute)
 	// pre-fill some dummy history to start
@@ -1252,6 +1279,8 @@ func systemTelemetryWorker() {
 		historySeries = append(historySeries, TimeSeriesPoint{Time: t.Format("15:04"), QPS: float64(6000 + i*100), Latency: float64(12 + i/2), CacheRatio: float64(80 + i)})
 	}
 	metricsMutex.Unlock()
+
+	var lastQuestions float64
 
 	for range ticker.C {
 		out, err := exec.Command("rec_control", "get-all").Output()
@@ -1271,10 +1300,15 @@ func systemTelemetryWorker() {
 			if hits+misses > 0 {
 				hitRatio = (hits / (hits + misses)) * 100
 			}
-			uptime := metrics["uptime"]
-			if uptime > 0 {
-				qps = metrics["questions"] / uptime
+			
+			if lastQuestions > 0 {
+				qps = (metrics["questions"] - lastQuestions) / 60.0
+				if qps < 0 { qps = 0 }
+			} else {
+				qps = 0
 			}
+			lastQuestions = metrics["questions"]
+			
 			latency = metrics["qa-latency"] / 1000.0
 		}
 		
