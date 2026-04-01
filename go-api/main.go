@@ -486,15 +486,23 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		json.Unmarshal([]byte(axfrValue), &axfrFeeds)
 		for _, f := range axfrFeeds {
 			statusStr := "Disconnected"
+			records := 0
 			if f.Enabled {
 				statusStr = "AXFR/IXFR Link"
+				// Fetch actual AXFR record count from PowerDNS memory dump
+				cmd := exec.Command("sh", "-c", fmt.Sprintf("rec_control dump-rpz %s /tmp/rpz_dump_%s >/dev/null 2>&1 && wc -l < /tmp/rpz_dump_%s", f.ZoneName, f.ZoneName, f.ZoneName))
+				out, _ := cmd.Output()
+				recCount, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+				if recCount > 0 {
+					records = recCount - 7 // Output approx offsets include SOA/Header
+				}
 			}
 			currentStatus = append(currentStatus, FeedStatus{
 				Name:    fmt.Sprintf("Zone: %s", f.ZoneName),
 				URL:     f.MasterIP,
 				Status:  statusStr,
 				Error:   "",
-				Records: 0,
+				Records: records,
 				Time:    "Native DNS",
 			})
 		}
@@ -685,11 +693,17 @@ func syncRPZWorker() {
 			var ipListStr string
 			db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipListStr)
 			blockAction := "CNAME ."
+			masterRedirect := ""
 			for _, ip := range strings.Split(ipListStr, "\n") {
 				if ip = strings.TrimSpace(ip); ip != "" {
-					blockAction = "A " + ip
+					blockAction = "CNAME redirect.rpz.local."
+					masterRedirect = "redirect A " + ip
 					break
 				}
+			}
+
+			if masterRedirect != "" {
+				compiledLines = append(compiledLines, masterRedirect)
 			}
 
 			// Load custom whitelist to override blacklist/RPZ
@@ -706,7 +720,7 @@ func syncRPZWorker() {
 			db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&blStr)
 			for _, d := range strings.Split(blStr, "\n") {
 				d = strings.TrimSpace(d)
-				if d != "" && !wlMap[d] {
+				if d != "" && !wlMap[d] && strings.Contains(d, ".") {
 					compiledLines = append(compiledLines, fmt.Sprintf("%s %s", d, blockAction))
 				}
 			}
@@ -761,8 +775,8 @@ func syncRPZWorker() {
 							domain = strings.ReplaceAll(domain, "https://", "")
 							domain = strings.Split(domain, "/")[0]
 							
-							// Ensure not whitelisted
-							if !wlMap[domain] {
+							// Ensure not whitelisted and valid format
+							if !wlMap[domain] && strings.Contains(domain, ".") && !strings.ContainsAny(domain, " _#/") {
 								validCount++
 								compiledLines = append(compiledLines, fmt.Sprintf("%s %s", domain, blockAction))
 							}
