@@ -302,7 +302,7 @@ func generateForwardersConfig() {
 func generateLuaConfig() {
 	// Pastikan file zona ada sebelum PowerDNS mencoba me-reload LUA
 	if _, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); os.IsNotExist(err) {
-		ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte("$ORIGIN rpz.local.\n$TTL 60\n@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H\n@ IN NS localhost.\n\n"), 0644)
+		ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte("$ORIGIN rpz.local.\n$TTL 60\n@ IN SOA localhost. root.localhost. 1 43200 900 1814400 7200\n@ IN NS localhost.\n\n"), 0644)
 	}
 
 	var axfrValue string
@@ -316,7 +316,7 @@ func generateLuaConfig() {
 
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
-			luaContent += fmt.Sprintf(`rpzMaster("%s", "%s")`+"\n", f.MasterIP, f.ZoneName)
+			luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="redirect.rpz.local."})`+"\n", f.MasterIP, f.ZoneName)
 		}
 	}
 
@@ -674,9 +674,9 @@ func syncRPZWorker() {
 			var feeds []RPZFeed
 			json.Unmarshal([]byte(value), &feeds)
 
-			// Pastikan file zona selalu ada saat startup untuk PowerDNS
+			// Provide default zone file if it doesn't physically exist for some reason
 			if _, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); os.IsNotExist(err) {
-				ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte("$ORIGIN rpz.local.\n$TTL 60\n@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H\n@ IN NS localhost.\n\n"), 0644)
+				ioutil.WriteFile("/etc/powerdns/rpz_compiled.zone", []byte("$ORIGIN rpz.local.\n$TTL 60\n@ IN SOA localhost. root.localhost. 1 43200 900 1814400 7200\n@ IN NS localhost.\n\n"), 0644)
 			}
 
 			var newStatuses []FeedStatus
@@ -685,7 +685,7 @@ func syncRPZWorker() {
 			compiledLines := []string{
 				"$ORIGIN rpz.local.",
 				"$TTL 60",
-				"@ IN SOA localhost. root.localhost. 1 12H 15M 3W 2H",
+				"@ IN SOA localhost. root.localhost. 1 43200 900 1814400 7200",
 				"@ IN NS localhost.",
 				"",
 			}
