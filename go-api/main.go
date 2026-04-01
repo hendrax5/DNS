@@ -312,11 +312,26 @@ func generateLuaConfig() {
 		json.Unmarshal([]byte(axfrValue), &axfrFeeds)
 	}
 
+	var ipListStr string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipListStr)
+	var lamanLabuhIP string
+	for _, ip := range strings.Split(ipListStr, "\n") {
+		if ip = strings.TrimSpace(ip); ip != "" {
+			lamanLabuhIP = ip
+			break
+		}
+	}
+
 	luaContent := `rpzFile("/etc/powerdns/rpz_compiled.zone")` + "\n"
 
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
-			luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="redirect.rpz.local."})`+"\n", f.MasterIP, f.ZoneName)
+			if lamanLabuhIP != "" {
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="%s"})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP)
+			} else {
+				// Use Kominfo's default redirect if no local override
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s")`+"\n", f.MasterIP, f.ZoneName)
+			}
 		}
 	}
 
@@ -697,7 +712,7 @@ func syncRPZWorker() {
 			masterRedirect := ""
 			for _, ip := range strings.Split(ipListStr, "\n") {
 				if ip = strings.TrimSpace(ip); ip != "" {
-					blockAction = "CNAME redirect.rpz.local."
+					blockAction = "A " + ip
 					masterRedirect = "redirect A " + ip
 					break
 				}
