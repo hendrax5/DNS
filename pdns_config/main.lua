@@ -1,9 +1,10 @@
 -- Lua PreResolve Hook for ACL Management
 acl = newNMG()
 
--- Open query log file safely
+-- Open query log file safely (128KB VBUF for lock-free speed)
+math.randomseed(os.time())
 local logfile = io.open("/var/log/pdns-queries.log", "a")
-if logfile then logfile:setvbuf("line") end
+if logfile then logfile:setvbuf("full", 131072) end
 
 -- Load Allowed IPs from text file
 local acl_file = "/etc/powerdns/allowed_ips.txt"
@@ -27,7 +28,19 @@ function gettag(remote, ednsmask, localmac, qname, qtype, ednsoptions, tcp)
     end
 
     if logfile then
-        logfile:write(string.format('{"time":%d, "ip":"%s", "qname":"%s", "type":%d, "action":"%s"}\n', os.time(), remote:toString(), qname:toString(), qtype, action))
+        local logIt = true
+        local isAnomaly = (qtype == 255 or qtype == 16) -- ANY, TXT
+        
+        -- Probabilistic Sampling: Log 1/20 of ALLOW traffic to prevent disk I/O DOS
+        if action == "ALLOW" and not isAnomaly then
+            if math.random(1, 100) > 5 then
+                logIt = false
+            end
+        end
+
+        if logIt then
+            logfile:write(string.format('{"time":%d, "ip":"%s", "qname":"%s", "type":%d, "action":"%s"}\n', os.time(), remote:toString(), qname:toString(), qtype, action))
+        end
     end
 
     if drop then

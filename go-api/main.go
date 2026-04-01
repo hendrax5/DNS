@@ -1053,18 +1053,21 @@ func streamLogs() {
 			}
 			
 			// Detect Query Types and Anomalies
+			var isAnomaly bool
+			var typeName string = "OTHER"
 			if qtype, ok := entry["type"].(float64); ok {
 				qtypeInt := int(qtype)
-				var typeName string
 				switch qtypeInt {
 				case 1: typeName = "A"
 				case 28: typeName = "AAAA"
 				case 15: typeName = "MX"
 				case 16: typeName = "TXT"
 				case 255: typeName = "ANY"
-				default: typeName = "OTHER"
 				}
-				queryTypeMap[typeName]++
+
+				if typeName == "ANY" || typeName == "TXT" {
+					isAnomaly = true
+				}
 
 				ipStr, _ := entry["ip"].(string)
 				domainStr, _ := entry["qname"].(string)
@@ -1079,21 +1082,29 @@ func streamLogs() {
 				}
 			}
 
+			// Analytics Scaling Factor based on Lua 5% Sampling Rate (1 in 20)
+			scaleFactor := 1
+			if action == "ALLOW" && !isAnomaly {
+				scaleFactor = 20
+			}
+
+			queryTypeMap[typeName] += scaleFactor
+
 			if ip, ok := entry["ip"].(string); ok {
 				if topClients[ip] == nil {
 					topClients[ip] = &ClientStat{}
 				}
 				if action == "ALLOW" {
-					topClients[ip].Allow++
+					topClients[ip].Allow += scaleFactor
 				} else {
-					topClients[ip].Block++
+					topClients[ip].Block += 1
 				}
 			}
 			if domain, ok := entry["qname"].(string); ok {
 				if action == "ALLOW" {
-					topAllowedDomains[domain]++
+					topAllowedDomains[domain] += scaleFactor
 				} else {
-					topBlockedDomains[domain]++
+					topBlockedDomains[domain] += 1
 				}
 			}
 			metricsMutex.Unlock()
