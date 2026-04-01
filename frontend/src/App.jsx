@@ -22,7 +22,7 @@ import {
   Trash2,
   ShieldBan
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -409,274 +409,209 @@ function App() {
         )}
 
         {activeTab === 'dashboard' ? (
-          <div className="space-y-6">
-            <div className="flex justify-between items-end">
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">System Telemetry</h1>
-                <p className="text-slate-400 text-sm mt-1">Real-time DNS performance and threat intelligence monitoring.</p>
+          <div className="space-y-6 flex flex-col h-full animate-fadeIn transition-all">
+            {/* Header Dashboard dihilangkan untuk memberi ruang Dashboard rapat / dense */}
+            
+            {/* Row 1: KPI Tiles */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-blue-500/50 transition">
+                <div className="absolute -inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl pointer-events-none"></div>
+                <Globe className="w-5 h-5 text-blue-400 mb-2" />
+                <span className="text-3xl font-bold text-white tracking-tight">{stats?.qps?.toLocaleString() || 0}</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Total Query / Sec</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-md border border-emerald-500/20">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                Protected & Online
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-500/50 transition">
+                <div className="absolute -inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl pointer-events-none"></div>
+                <Activity className="w-5 h-5 text-indigo-400 mb-2" />
+                <span className="text-3xl font-bold text-white tracking-tight">{stats?.avg_latency_ms || 0}</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Avg Response ms</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-emerald-500/50 transition">
+                <div className="absolute -inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl pointer-events-none"></div>
+                <Database className="w-5 h-5 text-emerald-400 mb-2" />
+                <span className="text-3xl font-bold text-white tracking-tight">{stats?.cache_hit_ratio || 0}<span className="text-lg text-slate-400 ml-1">%</span></span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Cache hit ratio</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-rose-500/50 transition">
+                <div className="absolute -inset-0 bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl pointer-events-none"></div>
+                <ShieldBan className="w-5 h-5 text-rose-500 mb-2" />
+                <span className="text-3xl font-bold text-rose-400 tracking-tight">{(topAnalytics.blocked.reduce((sum, item) => sum + item.count, 0)).toLocaleString()}</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Threats Blocked</span>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group hover:border-amber-500/50 transition">
+                <div className="absolute -inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl pointer-events-none"></div>
+                <Cpu className="w-5 h-5 text-amber-500 mb-2" />
+                <span className="text-3xl font-bold text-white tracking-tight">{stats?.cpu_usage || 0}<span className="text-lg text-slate-400 ml-1">%</span></span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{stats?.mem_usage_mb || 0} MB RAM</span>
               </div>
             </div>
 
-            {/* Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-slate-400 font-medium text-sm">Queries / Second</h3>
-                  <Activity className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.qps.toLocaleString() : '...'}</span>
-                  <span className="text-xs text-emerald-400 font-medium">Live</span>
-                </div>
-              </div>
-              
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-slate-400 font-medium text-sm">Cache Hit Ratio</h3>
-                  <Server className="w-5 h-5 text-emerald-500" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.cache_hit_ratio : '...'}%</span>
-                  <span className="text-xs text-emerald-400 font-medium">Optimal</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-slate-400 font-medium text-sm">Recursive Latency</h3>
-                  <Globe className="w-5 h-5 text-slate-400" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.avg_latency_ms : '...'}</span>
-                  <span className="text-lg text-slate-500 ml-1">ms</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-slate-400 font-medium text-sm">CPU Usage</h3>
-                  <Cpu className="w-5 h-5 text-amber-500" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.cpu_usage : '...'}%</span>
-                  <span className="text-xs text-emerald-400 font-medium">Stable</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-slate-700 transition-colors duration-200 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-slate-400 font-medium text-sm">Real Memory</h3>
-                  <HardDrive className="w-5 h-5 text-purple-500" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-white">{stats ? stats.mem_usage_mb : '...'}</span>
-                  <span className="text-lg text-slate-500 ml-1">MB</span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Domain Checker Widget */}
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex items-center justify-between gap-6">
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2">
-                  <Globe className="w-4 h-4" /> Diagnostik Domain (Checker)
+            {/* Row 2: Time Series */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col shadow-lg">
+                <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-2"><BarChart2 className="w-4 h-4 text-blue-400" /> Query Volume (QPS)</span>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded">Harian/Mingguan</span>
                 </h3>
-                <p className="text-xs text-slate-500">Ketahui secara instan apakah domain tertentu dibidik oleh RPZ/AXFR ISP/Kominfo.</p>
-              </div>
-              <div className="flex flex-1 items-center gap-3">
-                <input 
-                  type="text" 
-                  id="checkDomainInput"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') document.getElementById('btnCheckDomain').click()
-                  }}
-                  placeholder="misal. x.com" 
-                  className="flex-1 bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500/50 shadow-inner"
-                />
-                <button 
-                  id="btnCheckDomain"
-                  onClick={async () => {
-                    const btn = document.getElementById('btnCheckDomain');
-                    const origText = btn.innerText;
-                    btn.innerText = 'Memeriksa...';
-                    try {
-                      const domain = document.getElementById('checkDomainInput').value.trim();
-                      if(!domain) return;
-                      const res = await fetch('/api/check-domain?domain=' + encodeURIComponent(domain));
-                      const data = await res.json();
-                      if(data.is_blocked) {
-                        showNotification(`LOCKED: ${domain} dicekal! (Dialihkan ke: ${data.resolve_to})`, 'error');
-                      } else {
-                        showNotification(`ALLOW: ${domain} bersih dari blokir. (${data.resolve_to || 'NXDOMAIN'})`, 'success');
-                      }
-                    } catch (e) {
-                      showNotification('Gagal menghubungi Engine DNS', 'error');
-                    } finally {
-                      btn.innerText = origText;
-                    }
-                  }}
-                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white rounded-lg transition-colors shadow-[0_0_15px_rgba(79,70,229,0.3)] whitespace-nowrap cursor-pointer"
-                >
-                  Cek Domain
-                </button>
-              </div>
-            </div>
-
-            {/* Charts & Intel */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Traffic Chart */}
-              <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-xl">
-                <h3 className="text-lg font-semibold flex items-center gap-2 text-slate-200 mb-6">
-                  <BarChart2 className="w-5 h-5 text-slate-400" /> Tren Lalu Lintas (60 Detik)
-                </h3>
-                <div className="h-[300px] w-full">
+                <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={stats?.history_series || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="colorQps" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                        <linearGradient id="colorQpsV3" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                           <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                         </linearGradient>
-                        <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                        </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="4 4" stroke="#1e293b" vertical={false} />
-                      <XAxis dataKey="time" hide />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="time" stroke="#475569" tick={{fill: '#64748b', fontSize: 11}} axisLine={false} tickLine={false} />
                       <YAxis stroke="#475569" tick={{fill: '#64748b', fontSize: 12}} axisLine={false} tickLine={false} />
-                      <Tooltip 
-                        contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', color: '#f8fafc'}}
-                        cursor={{stroke: '#334155', strokeWidth: 1, strokeDasharray: '4 4'}}
-                      />
-                      <Area type="monotone" name="Total Permintaan" dataKey="qps" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorQps)" animationDuration={300} isAnimationActive={false} />
-                      <Area type="monotone" name="Diblokir RPZ/ACL" dataKey="blocked" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorBlocked)" animationDuration={300} isAnimationActive={false} />
+                      <Tooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', color: '#f8fafc', fontSize: '13px'}} cursor={{stroke: '#334155', strokeWidth: 1}} />
+                      <Area type="monotone" name="QPS" dataKey="qps" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorQpsV3)" isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Threat Feeds */}
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col">
-                <h3 className="text-lg font-semibold flex items-center gap-2 text-slate-200 mb-6">
-                  <ShieldAlert className="w-5 h-5 text-slate-400" /> DNS RPZ Feeds
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col shadow-lg">
+                <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-2"><Activity className="w-4 h-4 text-indigo-400" /> Latency & Efficiency</span>
                 </h3>
-                <div className="flex flex-col gap-4">
-                  {stats?.rpz_status?.map((feed, i) => (
-                    <div key={i} className="flex flex-col p-4 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer group">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="font-semibold text-sm text-slate-200">{feed.name}</span>
-                        <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> {feed.status}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs text-slate-500">
-                        <span>{feed.records !== undefined ? feed.records.toLocaleString() + " Domain Valid" : "~2.4M Signatures"}</span>
-                        <span>{feed.time}</span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats?.history_series || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorLat" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="time" stroke="#475569" tick={{fill: '#64748b', fontSize: 11}} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" stroke="#818cf8" tick={{fill: '#818cf8', fontSize: 12}} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="right" orientation="right" stroke="#34d399" tick={{fill: '#34d399', fontSize: 12}} axisLine={false} tickLine={false} domain={[0,100]} />
+                      <Tooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', color: '#f8fafc', fontSize: '13px'}} cursor={{stroke: '#334155', strokeWidth: 1}}/>
+                      <Area yAxisId="left" type="monotone" name="Latency (ms)" dataKey="latency" stroke="#818cf8" strokeWidth={2} fillOpacity={1} fill="url(#colorLat)" isAnimationActive={false} />
+                      <Area yAxisId="right" type="monotone" name="Cache Ratio (%)" dataKey="cacheRatio" stroke="#34d399" strokeDasharray="4 4" fill="none" strokeWidth={2} isAnimationActive={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>
 
-            {/* Custom Dig Monitor */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col h-full shadow-lg">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-1 uppercase tracking-wider flex items-center gap-2">
-                   <Activity className="w-4 h-4 text-rose-500" />
-                   Pemantauan Akses Siber (Top Blocked)
-                 </h3>
-                 <p className="text-xs text-slate-500 mb-4">Situs terlarang yang paling sering dicoba diakses oleh jaringan Anda hari ini.</p>
-                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                   {topAnalytics.blocked.map((d, i) => (
-                     <div key={i} className="flex justify-between items-center px-4 py-2.5 bg-[#0b1120] rounded-lg border border-slate-800/80 shadow-inner group hover:border-slate-700 transition">
-                       <span className="text-rose-100 font-medium text-sm truncate pr-2 flex items-center gap-3">
-                         <span className="w-6 text-center text-xs font-bold text-slate-500 bg-slate-800 rounded px-1.5 py-0.5">{i+1}</span>
-                         {d.name}
-                       </span>
-                       <span className="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded text-xs border border-rose-500/20 shadow-[0_0_10px_rgba(225,29,72,0.1)]">{d.count.toLocaleString()} x</span>
-                     </div>
-                   ))}
-                   {topAnalytics.blocked.length === 0 && <span className="text-slate-500 text-sm">Belum ada blokir sejauh ini.</span>}
-                 </div>
+            {/* Row 3: Distributions & Security Alerts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center">
+                <h3 className="text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wider w-full flex items-center gap-2">Response Codes</h3>
+                <div className="w-full h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={[
+                        {name: 'NOERROR', value: stats?.response_codes?.NOERROR || 1},
+                        {name: 'NXDOMAIN', value: stats?.response_codes?.NXDOMAIN || 0},
+                        {name: 'SERVFAIL', value: stats?.response_codes?.SERVFAIL || 0}
+                      ]} cx="50%" cy="45%" innerRadius={60} outerRadius={80} dataKey="value" stroke="none" labelLine={false}>
+                        <Cell fill="#10b981" />
+                        <Cell fill="#f59e0b" />
+                        <Cell fill="#ef4444" />
+                      </Pie>
+                      <Tooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '4px', fontSize: '12px'}} itemStyle={{color:'#e2e8f0'}} />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{fontSize: '11px', color: '#94a3b8'}} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-                 {/* Top Offenders (IP Terbandel) */}
-                 <h3 className="text-sm font-semibold text-slate-400 mt-8 mb-1 uppercase tracking-wider flex items-center gap-2">
-                   <ShieldBan className="w-4 h-4 text-orange-500" />
-                   Top Policy Offenders (IP Terbandel)
-                 </h3>
-                 <p className="text-xs text-slate-500 mb-4">Alamat IP perangkat dengan probabilitas pelanggaran akses tertinggi.</p>
-                 <div className="space-y-3">
-                   {topAnalytics.clients.map((c, i) => (
-                     <div key={i} className="flex justify-between items-center px-4 py-3 bg-[#0b1120] hover:bg-slate-800/30 rounded-lg border border-slate-800/80 transition-colors">
-                       <span className="text-blue-200 text-sm font-bold font-mono tracking-widest">{c.name}</span>
-                       <div className="flex flex-col items-end gap-1">
-                          <div className="flex gap-2 text-xs font-semibold">
-                            <span className="text-rose-400">{c.block ? c.block.toLocaleString() : 0} Blok</span>
-                          </div>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg flex flex-col items-center">
+                <h3 className="text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wider w-full flex items-center gap-2">Query Types</h3>
+                <div className="w-full h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={Object.entries(stats?.query_types || {'A':1}).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v]) => ({name: k, value: v}))} cx="50%" cy="45%" innerRadius={0} outerRadius={80} dataKey="value" stroke="none" labelLine={false}>
+                        {Object.entries(stats?.query_types || {}).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#3b82f6', '#8b5cf6', '#0ea5e9', '#ec4899', '#f97316'][index % 5]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '4px', fontSize: '12px'}} itemStyle={{color:'#e2e8f0'}} />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{fontSize: '11px', color: '#94a3b8'}} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg overflow-hidden flex flex-col h-[300px]">
+                <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-rose-500" /> DNS Anomaly Sentinel</span>
+                  <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded border border-rose-500/30 font-bold animate-pulse">LIVE</span>
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {stats?.telemetry_alerts?.length > 0 ? stats.telemetry_alerts.map((a, i) => (
+                    <div key={i} className={`p-3 rounded-lg border text-xs leading-relaxed ${a.Level === 'CRIT' ? 'bg-rose-500/10 border-rose-500/30 text-rose-200' : 'bg-amber-500/10 border-amber-500/30 text-amber-200'}`}>
+                       <div className="mb-1 flex justify-between items-center">
+                          <span className={`font-bold ${a.Level === 'CRIT' ? 'text-rose-400' : 'text-amber-400'}`}>[{a.Level}] ALARM</span>
+                          <span className="opacity-70 font-mono text-[10px]">{a.Time}</span>
                        </div>
-                     </div>
-                   ))}
-                   {topAnalytics.clients.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
-                 </div>
-               </div>
+                       <p className="opacity-90">{a.Message}</p>
+                    </div>
+                  )) : (
+                    <div className="flex h-full flex-col items-center justify-center text-slate-500 space-y-2 opacity-50">
+                       <ShieldCheck className="w-8 h-8 text-emerald-500" />
+                       <span className="text-xs font-medium">No Anomalies Detected. Network Secure.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col h-full shadow-lg">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-1 uppercase tracking-wider flex items-center gap-2">
-                   <Globe className="w-4 h-4 text-indigo-400" />
-                   Custom Target Dig Monitor 
-                 </h3>
-                 <p className="text-xs text-slate-500 mb-6">Analisis presisi latensi resolusi DNS tegar dari Engine PowerDNS lokal ke domain krusial Anda secara realtime.</p>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     {digHealth.map((d, i) => (
-                         <div key={i} className="flex flex-col bg-[#0b1120] border border-slate-800 p-4 rounded-xl shadow-inner relative overflow-hidden group hover:border-slate-700 transition">
-                             <div className={`absolute top-0 right-0 w-16 h-16 blur-3xl opacity-20 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                             <span className="text-xs text-slate-400 mb-1 truncate">{d.domain}</span>
-                             <div className="flex items-end gap-2">
-                                <span className={`text-3xl font-bold font-mono tracking-tight ${d.status === 'OK' ? 'text-white' : 'text-rose-400'}`}>
-                                    {d.status === 'OK' ? d.latency : 'ERR'}
-                                </span>
-                                <span className="text-slate-500 text-sm font-semibold mb-1">ms</span>
-                             </div>
-                             <div className="mt-3 flex items-center gap-1.5">
-                                 <span className="relative flex h-2 w-2">
-                                    <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${d.status === 'OK' ? 'animate-ping bg-emerald-400' : 'bg-rose-500'}`}></span>
-                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                 </span>
-                                 <span className={`text-[10px] font-bold tracking-wider uppercase ${d.status === 'OK' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                     {d.status === 'OK' ? 'RESOLVED' : 'TIMEOUT'}
-                                 </span>
-                             </div>
-                         </div>
-                     ))}
-                     {digHealth.length === 0 && <span className="text-slate-500 text-sm italic col-span-2 text-center p-6 border border-dashed border-slate-800 rounded-lg">Target monitor belum diset oleh Admin.</span>}
-                 </div>
-                 
-                 <h3 className="text-sm font-semibold text-slate-400 mt-8 mb-1 uppercase tracking-wider flex items-center gap-2">
-                   <Server className="w-4 h-4 text-emerald-500" />
-                   Aktivitas Domain Sah 
-                 </h3>
-                 <div className="space-y-3 mt-4">
-                   {topAnalytics.allowed.map((d, i) => (
-                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-slate-800/40">
-                       <span className="text-slate-300 text-sm truncate pr-2 flex items-center gap-2 text-blue-100"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{d.name}</span>
-                       <span className="text-slate-400 font-medium text-sm">{d.count.toLocaleString()}</span>
+            {/* Row 4: Custom Dig Monitor & Subnets */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
+             <div className="bg-[#0f172a] shadow-lg border border-slate-800 p-6 rounded-xl flex flex-col h-full">
+               <h3 className="text-sm font-semibold text-slate-400 mb-1 uppercase tracking-wider flex items-center gap-2">
+                 <Globe className="w-4 h-4 text-indigo-400" />
+                 Upstream Health Monitor
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                   {digHealth.map((d, i) => (
+                       <div key={i} className="flex flex-col bg-[#0b1120] border border-slate-800 p-4 rounded-xl relative overflow-hidden group hover:border-slate-700 transition">
+                           <div className={`absolute top-0 right-0 w-16 h-16 blur-2xl opacity-10 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                           <span className="text-xs text-slate-400 mb-1 truncate">{d.domain}</span>
+                           <div className="flex items-end gap-2">
+                              <span className={`text-3xl font-bold font-mono tracking-tight ${d.status === 'OK' ? 'text-white' : 'text-rose-400'}`}>
+                                  {d.status === 'OK' ? d.latency : 'ERR'}
+                              </span>
+                              <span className="text-slate-500 text-sm font-semibold mb-1">ms</span>
+                           </div>
+                           <div className="mt-3 flex items-center gap-1.5">
+                               <span className="relative flex h-2 w-2">
+                                  <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${d.status === 'OK' ? 'animate-ping bg-emerald-400' : 'bg-rose-500'}`}></span>
+                                  <span className={`relative inline-flex rounded-full h-2 w-2 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                               </span>
+                               <span className={`text-[10px] font-bold tracking-wider uppercase ${d.status === 'OK' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                   {d.status === 'OK' ? 'RESOLVED' : 'TIMEOUT'}
+                               </span>
+                           </div>
+                       </div>
+                   ))}
+                   {digHealth.length === 0 && <span className="text-slate-500 text-sm italic col-span-2 text-center p-6 border border-dashed border-slate-800 rounded-lg">Monitoring target...</span>}
+               </div>
+             </div>
+
+             <div className="flex flex-col gap-6">
+               <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-lg">
+                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Top Access Blocked (Global Lists)</h3>
+                 <div className="space-y-3">
+                   {topAnalytics.blocked.map((d, i) => (
+                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-rose-900/30 hover:border-rose-800/50">
+                       <span className="text-rose-100 text-xs truncate pr-2 font-mono flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>{d.name}</span>
+                       <span className="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md text-xs border border-rose-500/20">{d.count.toLocaleString()} x</span>
                      </div>
                    ))}
-                   {topAnalytics.allowed.length === 0 && <span className="text-slate-500 text-sm">Belum ada data...</span>}
+                   {topAnalytics.blocked.length === 0 && <span className="text-slate-500 text-sm">No threats blocked...</span>}
                  </div>
                </div>
+             </div>
             </div>
           </div>
+
         ) : activeTab === 'admin' && isAuthenticated ? (
           <div className="space-y-6 flex flex-col h-full">
             <div className="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-lg text-indigo-300 w-max mb-2 shadow-inner">
