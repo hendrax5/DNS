@@ -10,7 +10,7 @@ services:
       - "53:53/tcp"
       - "80:80/tcp"
     tmpfs:
-      - /var/log
+      - /var/log/netshield
     ulimits:
       nofile:
         soft: 1048576

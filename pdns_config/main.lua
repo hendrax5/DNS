@@ -3,7 +3,7 @@ acl = newNMG()
 
 -- Open query log file safely (128KB VBUF for lock-free speed)
 math.randomseed(os.time())
-local logfile = io.open("/var/log/pdns-queries.log", "a")
+local logfile = io.open("/var/log/netshield/pdns-queries.log", "a")
 if logfile then logfile:setvbuf("full", 131072) end
 
 -- Load Allowed IPs from text file

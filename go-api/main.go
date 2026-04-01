@@ -1012,7 +1012,7 @@ func GetTopAnalytics(c *fiber.Ctx) error {
 
 func streamLogs() {
 	// Create file if not exist
-	filePath := "/var/log/pdns-queries.log"
+	filePath := "/var/log/netshield/pdns-queries.log"
 	
 	// Open file
 	var file *os.File
