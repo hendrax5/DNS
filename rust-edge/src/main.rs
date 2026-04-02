@@ -36,29 +36,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut interval = tokio::time::interval(Duration::from_secs(10));
         loop {
             interval.tick().await;
-            if let Ok(conn) = Connection::open("/data/netshield.db") {
-                let mut stmt = conn.prepare("SELECT key, value FROM settings WHERE key IN ('custom_blacklist', 'custom_whitelist', 'acl_ips')").unwrap_or_else(|_| panic!("DB!"));
-                if let Ok(mut rows) = stmt.query([]) {
-                    let mut new_policy = PolicyData::default();
-                    while let Ok(Some(row)) = rows.next() {
-                        let key: String = row.get(0).unwrap_or_default();
-                        let val: String = row.get(1).unwrap_or_default();
-                        
-                        let parts = val.split(|c| c == '\n' || c == ',' || c == ' ');
-                        for part in parts {
-                            let p = part.trim();
-                            if !p.is_empty() {
-                                match key.as_str() {
-                                    "custom_blacklist" => { new_policy.blacklist.insert(p.to_string()); }
-                                    "custom_whitelist" => { new_policy.whitelist.insert(p.to_string()); }
-                                    "acl_ips" => { new_policy.acl_ips.insert(p.to_string()); }
-                                    _ => {}
+            
+            let mut new_policy = PolicyData::default();
+            let mut valid_fetch = false;
+            
+            // Scope Sinkron (Blokade khusus untuk Non-Send Rusqlite Iterator)
+            {
+                if let Ok(conn) = Connection::open("/data/netshield.db") {
+                    if let Ok(mut stmt) = conn.prepare("SELECT key, value FROM settings WHERE key IN ('custom_blacklist', 'custom_whitelist', 'acl_ips')") {
+                        if let Ok(mut rows) = stmt.query([]) {
+                            valid_fetch = true;
+                            while let Ok(Some(row)) = rows.next() {
+                                let key: String = row.get(0).unwrap_or_default();
+                                let val: String = row.get(1).unwrap_or_default();
+                                
+                                let parts = val.split(|c| c == '\n' || c == ',' || c == ' ');
+                                for part in parts {
+                                    let p = part.trim();
+                                    if !p.is_empty() {
+                                        match key.as_str() {
+                                            "custom_blacklist" => { new_policy.blacklist.insert(p.to_string()); }
+                                            "custom_whitelist" => { new_policy.whitelist.insert(p.to_string()); }
+                                            "acl_ips" => { new_policy.acl_ips.insert(p.to_string()); }
+                                            _ => {}
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                    *policy_cloned.write().await = new_policy;
                 }
+            } // Semua variabel memori rusqlite MATI di titik ini.
+
+            // Aman melakukan await karena tidak ada "Non-Send" future tersisa
+            if valid_fetch {
+                *policy_cloned.write().await = new_policy;
             }
         }
     });
