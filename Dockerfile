@@ -13,7 +13,7 @@ RUN npm install && npm run build
 
 # Final Stage: PowerDNS + Supervisord Alpine base
 FROM alpine:latest
-RUN apk add --no-cache supervisor dnsdist pdns-recursor lua sqlite tzdata bind-tools
+RUN apk add --no-cache supervisor dnsdist pdns-recursor lua sqlite tzdata bind-tools numactl curl
 
 ENV TZ=Asia/Jakarta
 RUN cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
@@ -28,11 +28,11 @@ COPY supervisord.conf /etc/supervisord.conf
 COPY pdns_config/ /etc/powerdns/
 
 # Setup directories
-RUN mkdir -p /var/run/pdns-recursor /var/log/supervisor /data && \
+RUN mkdir -p /var/run/pdns-recursor /var/log/supervisor /data /etc/powerdns/tls && \
     chown recursor:recursor /var/run/pdns-recursor && \
-    touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua /etc/powerdns/rpz_feeds.txt /etc/powerdns/allowed_ips.txt /etc/powerdns/rpz_compiled.zone
+    touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua /etc/powerdns/rpz_feeds.txt /etc/powerdns/allowed_ips.txt /etc/powerdns/rpz_compiled.zone /etc/powerdns/custom_blacklist.zone /etc/powerdns/custom_whitelist.zone
 
-# Expose ports
-EXPOSE 53/udp 53/tcp 80/tcp
+# Expose ports (DNS, HTTP Dashboard, DoT, DoH)
+EXPOSE 53/udp 53/tcp 80/tcp 853/tcp 443/tcp
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
