@@ -10,6 +10,13 @@ WORKDIR /app
 COPY frontend/ .
 RUN npm install && npm run build
 
+# Stage 3: Build Rust Edge Proxy
+FROM rust:alpine AS rust-builder
+RUN apk add --no-cache musl-dev
+WORKDIR /app
+COPY rust-edge/ .
+RUN cargo build --release
+
 # Final Stage: PowerDNS + Supervisord Alpine base
 FROM alpine:latest
 RUN apk add --no-cache supervisor pdns-recursor lua sqlite tzdata bind-tools
@@ -21,6 +28,7 @@ RUN cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
 # Copy built artifacts
 COPY --from=backend-builder /app/netshield-api /usr/local/bin/netshield-api
 COPY --from=frontend-builder /app/dist /var/www/html/
+COPY --from=rust-builder /app/target/release/rust-edge /usr/local/bin/rust-edge
 
 # Copy configurations
 COPY supervisord.conf /etc/supervisord.conf
