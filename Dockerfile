@@ -12,7 +12,7 @@ RUN npm install && npm run build
 
 # Stage 3: Build Rust Edge Proxy
 FROM rust:alpine AS rust-builder
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache musl-dev gcc build-base
 WORKDIR /app
 COPY rust-edge/ .
 RUN cargo build --release

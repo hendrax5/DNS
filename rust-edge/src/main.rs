@@ -1,33 +1,67 @@
 use std::sync::Arc;
 use tokio::net::UdpSocket;
-use tokio::fs::{OpenOptions, read_to_string};
 use tokio::io::AsyncWriteExt;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::net::SocketAddr;
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::collections::HashSet;
+use tokio::sync::RwLock;
+use rusqlite::Connection;
+use tokio::fs::OpenOptions;
+
+#[derive(Default, Clone)]
+struct PolicyData {
+    pub blacklist: HashSet<String>,
+    pub whitelist: HashSet<String>,
+    pub acl_ips: HashSet<String>,
+}
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 [RUST-EDGE] V4.0 Carrier-Grade Telemetry Proxy Starting...");
+    println!("🚀 [RUST-EDGE] V4.1 Dynamic Sync Proxy Starting...");
 
-    // Pemuatan ACL IP 
-    let mut acl_ips = HashSet::new();
-    if let Ok(acl_data) = read_to_string("/etc/powerdns/allowed_ips.txt").await {
-        for line in acl_data.lines() {
-            let line = line.trim();
-            if !line.is_empty() && !line.starts_with('#') {
-                acl_ips.insert(line.to_string());
+    // Tembok Kebijakan Tertanam Dalam Memori (RwLock untuk kecepatan tinggi)
+    let policy = Arc::new(RwLock::new(PolicyData::default()));
+
+    // Menugaskan Pekerja Latar Belakang (Sync Database)
+    let policy_cloned = policy.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(10));
+        loop {
+            interval.tick().await;
+            if let Ok(conn) = Connection::open("/data/netshield.db") {
+                let mut stmt = conn.prepare("SELECT key, value FROM settings WHERE key IN ('custom_blacklist', 'custom_whitelist', 'acl_ips')").unwrap_or_else(|_| panic!("Failed DB"));
+                let mut rows = stmt.query([]).unwrap();
+                
+                let mut new_policy = PolicyData::default();
+                
+                while let Ok(Some(row)) = rows.next() {
+                    let key: String = row.get(0).unwrap_or_default();
+                    let val: String = row.get(1).unwrap_or_default();
+                    
+                    let parts = val.split(|c| c == '\n' || c == ',' || c == ' ');
+                    for part in parts {
+                        let p = part.trim();
+                        if !p.is_empty() {
+                            match key.as_str() {
+                                "custom_blacklist" => { new_policy.blacklist.insert(p.to_string()); }
+                                "custom_whitelist" => { new_policy.whitelist.insert(p.to_string()); }
+                                "acl_ips" => { new_policy.acl_ips.insert(p.to_string()); }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                
+                // Pertukaran Memori Atomik tanpa menjeda DNS Server (Lock Write sangat singkat)
+                *policy_cloned.write().await = new_policy;
             }
         }
-    }
-    let acl_ips = Arc::new(acl_ips);
+    });
 
     let local_addr = "0.0.0.0:53";
     let target_addr = "127.0.0.1:5353";
 
     let socket = Arc::new(UdpSocket::bind(local_addr).await?);
-    println!("🎯 [RUST-EDGE] Listening actively on {}", local_addr);
-    println!("🔰 [RUST-EDGE] Target Resolver: {}", target_addr);
+    println!("🎯 [RUST-EDGE] Binded 0.0.0.0:53. Connected to /data/netshield.db.");
 
     // Buka file log dalam mode Append Async
     let log_file = Arc::new(tokio::sync::Mutex::new(
@@ -40,21 +74,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut buf = [0u8; 1500];
 
-    // Loop Induk (Event-Loop Non-Blocking)
     loop {
         let (len, peer) = socket.recv_from(&mut buf).await?;
         let packet = buf[..len].to_vec();
         
-        let acl_view = acl_ips.clone();
         let sock_view = socket.clone();
         let log_view = log_file.clone();
+        let current_policy = policy.clone(); // Arcs cloning is cheap
 
-        // Spawn Asynchronous Task (Zero Blocking) untuk setiap paket UDP
+        // Lepaskan paket ke dalam kolam pekerja tokio
         tokio::spawn(async move {
             let mut qname = String::new();
             let mut qtype = 0;
 
-            // Raw Parsing Kecepatan Cahaya (Byte 12 -> Name)
             if len > 12 {
                 let mut idx = 12;
                 while idx < len {
@@ -73,47 +105,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            // Tembok Pertahanan 1: Cek IP ACL (Ganti Lua)
-            let peer_ip = peer.ip().to_string();
-            // --- TEMPORARY BYPASS FOR DOCKER NAT ---
-            // Di produksi masa depan, kita butuh Library CIDR Matcher disini.
-            /* 
-            if !acl_view.is_empty() && !acl_view.contains(&peer_ip) {
+            // Dapatkan salinan data kebijakan saat ini (Read Lock cepat)
+            let (is_wl, is_bl) = {
+                let p = current_policy.read().await;
+                // peer_ip dicocokkan (Commented due to Docker NAT)
+                // let peer_ip = peer.ip().to_string();
+                // if !p.acl_ips.is_empty() && !p.acl_ips.contains(&peer_ip) { drop... }
+                
+                (p.whitelist.contains(&qname), p.blacklist.contains(&qname))
+            };
+
+            // Logika Penyaringan Keras:
+            if !is_wl && is_bl {
+                // Tembak mati paket ini! Balas Klien dengan NXDOMAIN / REFUSED (3 / 5)
                 let mut resp = packet.clone();
-                resp[2] |= 0x80; // QR Response
-                resp[3] |= 0x05; // Refused
+                resp[2] |= 0x80; // Set flag QR (Response)
+                resp[3] |= 0x05; // Set RCODE = REFUSED (5)
+                
                 let _ = sock_view.send_to(&resp, &peer).await;
+                
+                // Logging asinkron untuk Dashboard
+                let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                let peer_ip = peer.ip().to_string();
+                let json_log = format!("{{\"time\":{}, \"ip\":\"{}\", \"qname\":\"{}\", \"type\":{}, \"action\":\"{}\"}}\n", 
+                                epoch, peer_ip, qname, qtype, "STATIC_BLOCKED");
+                if let Ok(mut handle) = log_view.try_lock() {
+                    let _ = handle.write_all(json_log.as_bytes()).await;
+                }
                 return;
             }
-            */
 
-            // Tembok Pertahanan 2: Pukul ke PowerDNS Belakang (Port 5353) menggunakan Ephemeral Socket
+            // Jika Aman atau masuk Whitelist, Lempar ke PowerDNS (Port 5353) untuk AXFR Resolution
             if let Ok(relay) = UdpSocket::bind("0.0.0.0:0").await {
                 if relay.send_to(&packet, target_addr).await.is_ok() {
                     let mut rel_buf = [0u8; 1500];
-                    // Timeout 2 detik
-                    if let Ok(Ok((rlen, _))) = tokio::time::timeout(std::time::Duration::from_secs(2), relay.recv_from(&mut rel_buf)).await {
+                    if let Ok(Ok((rlen, _))) = tokio::time::timeout(Duration::from_secs(2), relay.recv_from(&mut rel_buf)).await {
                         let answer = &rel_buf[..rlen];
                         
-                        // Cek RCODE PowerDNS
                         let rcode = answer[3] & 0x0F;
                         let action = if rcode == 3 || rcode == 5 { "RPZ_BLOCKED" } else { "ALLOW" };
 
-                        // Sampling Log 1/20 untuk ALLOW (Seperti Lua v3.0)
-                        let mut should_log = true;
                         let is_anomaly = qtype == 255 || qtype == 16;
+                        let mut should_log = true;
                         
                         if action == "ALLOW" && !is_anomaly {
-                            // Pseudo-random sampling
                             let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-                            if now % 100 > 5 {
-                                should_log = false; // 95% Chance to skip writing disk
-                            }
+                            if now % 100 > 5 { should_log = false; }
                         }
 
-                        // Tulis Log Telemetri Asinkron
                         if should_log {
                             let epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                            let peer_ip = peer.ip().to_string();
                             let json_log = format!("{{\"time\":{}, \"ip\":\"{}\", \"qname\":\"{}\", \"type\":{}, \"action\":\"{}\"}}\n", 
                                 epoch, peer_ip, qname, qtype, action);
                             if let Ok(mut handle) = log_view.try_lock() {
@@ -121,7 +163,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
 
-                        // Lempar balik ke Klien Asli
                         let _ = sock_view.send_to(answer, &peer).await;
                     }
                 }
