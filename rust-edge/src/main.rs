@@ -75,14 +75,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Tembok Pertahanan 1: Cek IP ACL (Ganti Lua)
             let peer_ip = peer.ip().to_string();
+            // --- TEMPORARY BYPASS FOR DOCKER NAT ---
+            // Di produksi masa depan, kita butuh Library CIDR Matcher disini.
+            /* 
             if !acl_view.is_empty() && !acl_view.contains(&peer_ip) {
-                // Drop or Refused
                 let mut resp = packet.clone();
                 resp[2] |= 0x80; // QR Response
                 resp[3] |= 0x05; // Refused
                 let _ = sock_view.send_to(&resp, &peer).await;
                 return;
             }
+            */
 
             // Tembok Pertahanan 2: Pukul ke PowerDNS Belakang (Port 5353) menggunakan Ephemeral Socket
             if let Ok(relay) = UdpSocket::bind("0.0.0.0:0").await {
