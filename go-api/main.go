@@ -188,6 +188,9 @@ func main() {
 	admin.Get("/dig-targets", GetDigTargets)
 	admin.Post("/dig-targets", SaveDigTargets)
 
+	admin.Get("/upstream", GetUpstreamConfig)
+	admin.Post("/upstream", SaveUpstreamConfig)
+
 	// Serve Static Frontend
 
 	app.Static("/", "/var/www/html/")
@@ -238,6 +241,8 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('safesearch_enabled', 'false')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('dnssec_enabled', 'false')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_sync_interval', '1440')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('upstream_forwarding_enabled', 'false')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('upstream_resolvers', '1.1.1.1,8.8.8.8,9.9.9.9')`)
 	db.Exec(`UPDATE settings SET value = '1440' WHERE key = 'rpz_sync_interval' AND value = '1'`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
 	db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.komdigi.go.id/assets/db/domains_isp","enabled":true}]' WHERE key = 'rpz_feeds' AND value NOT LIKE '[%'`)
@@ -274,6 +279,11 @@ func generateForwardersConfig() {
 	db.QueryRow("SELECT value FROM settings WHERE key = 'domain_forwarders'").Scan(&domFwd)
 	db.QueryRow("SELECT value FROM settings WHERE key = 'parent_resolvers'").Scan(&parResStr)
 
+	// Baca konfigurasi Upstream Global Forwarding
+	var upstreamEnabled, upstreamResolvers string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_forwarding_enabled'").Scan(&upstreamEnabled)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_resolvers'").Scan(&upstreamResolvers)
+
 	var fileLines []string
 	for _, line := range strings.Split(domFwd, "\n") {
 		line = strings.TrimSpace(line)
@@ -290,12 +300,29 @@ func generateForwardersConfig() {
 		}
 	}
 
+	// Parent Resolvers (manual per-slot)
 	var pIPs []string
 	for _, ip := range strings.Split(parResStr, ",") {
 		ip = strings.TrimSpace(ip)
 		if ip != "" { pIPs = append(pIPs, ip) }
 	}
 	if len(pIPs) > 0 { fileLines = append(fileLines, fmt.Sprintf("+.=%s", strings.Join(pIPs, ";"))) }
+
+	// Upstream Global Forwarding (jika diaktifkan dari panel admin)
+	// Ini memaksa PowerDNS meneruskan SEMUA cache-miss ke resolver raksasa
+	// alih-alih melakukan rekursi penuh sendiri (Root→TLD→Auth = 65ms → 5ms)
+	if upstreamEnabled == "true" && upstreamResolvers != "" {
+		var uIPs []string
+		for _, ip := range strings.Split(upstreamResolvers, ",") {
+			ip = strings.TrimSpace(ip)
+			if ip != "" { uIPs = append(uIPs, ip) }
+		}
+		if len(uIPs) > 0 {
+			// Forward global zone (.) ke upstream resolvers
+			// Ini MENGGANTIKAN parent_resolvers jika keduanya aktif
+			fileLines = append(fileLines, fmt.Sprintf("+.=%s", strings.Join(uIPs, ";")))
+		}
+	}
 
 	ioutil.WriteFile("/etc/powerdns/forward_zones.txt", []byte(strings.Join(fileLines, "\n")), 0644)
 }
@@ -716,6 +743,45 @@ func SaveForwarders(c *fiber.Ctx) error {
 	exec.Command("rec_control", "wipe-cache", "$").Run()
 
 	return c.JSON(fiber.Map{"message": "Forwarders updated successfully"})
+}
+
+func GetUpstreamConfig(c *fiber.Ctx) error {
+	var enabled, resolvers string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_forwarding_enabled'").Scan(&enabled)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_resolvers'").Scan(&resolvers)
+	
+	resolverList := []string{}
+	for _, r := range strings.Split(resolvers, ",") {
+		r = strings.TrimSpace(r)
+		if r != "" { resolverList = append(resolverList, r) }
+	}
+	
+	return c.JSON(fiber.Map{
+		"enabled":   enabled == "true",
+		"resolvers": resolverList,
+	})
+}
+
+func SaveUpstreamConfig(c *fiber.Ctx) error {
+	var req struct {
+		Enabled   bool     `json:"enabled"`
+		Resolvers []string `json:"resolvers"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	enabledStr := "false"
+	if req.Enabled { enabledStr = "true" }
+	
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'upstream_forwarding_enabled'", enabledStr)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'upstream_resolvers'", strings.Join(req.Resolvers, ","))
+
+	generateForwardersConfig()
+	exec.Command("rec_control", "reload-zones").Run()
+	exec.Command("rec_control", "wipe-cache", "$").Run()
+
+	return c.JSON(fiber.Map{"message": "Upstream forwarding configuration updated"})
 }
 
 func syncRPZWorker() {
