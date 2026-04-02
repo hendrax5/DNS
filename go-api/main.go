@@ -118,10 +118,8 @@ type TimeSeriesPoint struct {
 }
 
 func main() {
-	var wg sync.WaitGroup
-	writeCustomRPZ()
-	
 	initDB()
+	writeCustomRPZ()
 
 	// Mulai background workers
 	go syncRPZWorker()
