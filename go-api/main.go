@@ -118,6 +118,9 @@ type TimeSeriesPoint struct {
 }
 
 func main() {
+	var wg sync.WaitGroup
+	writeCustomRPZ()
+	
 	initDB()
 
 	// Mulai background workers
@@ -1119,10 +1122,10 @@ func streamLogs() {
 				}
 			}
 
-			// Analytics Scaling Factor based on Lua 5% Sampling Rate (1 in 20)
+			// Analytics Scaling Factor based on DNSDist 1% Sampling Rate
 			scaleFactor := 1
 			if action == "ALLOW" && !isAnomaly {
-				scaleFactor = 20
+				scaleFactor = 100
 			}
 
 			localQueryTypeMap[typeName] += scaleFactor
@@ -1239,8 +1242,39 @@ func SaveCustomLists(c *fiber.Ctx) error {
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'custom_blacklist'", strings.Join(req.Blacklist, "\n"))
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'custom_whitelist'", strings.Join(req.Whitelist, "\n"))
 	
+	writeCustomRPZ()
+	
 	select { case forceSync <- true: default: }
 	return c.JSON(fiber.Map{"message": "Custom Lists Updates Saved"})
+}
+
+func writeCustomRPZ() {
+	var bl, wl string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&bl)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'custom_whitelist'").Scan(&wl)
+
+	head := "$TTL 60\n@ IN SOA localhost. root.localhost. 1 60 60 60 60\n@ IN NS localhost.\n\n"
+	
+	blData := head
+	for _, x := range strings.Split(bl, "\n") {
+		x = strings.TrimSpace(x)
+		if x != "" {
+			blData += x + " IN CNAME .\n*." + x + " IN CNAME .\n"
+		}
+	}
+	os.WriteFile("/etc/powerdns/custom_blacklist.zone", []byte(blData), 0644)
+
+	wlData := head
+	for _, x := range strings.Split(wl, "\n") {
+		x = strings.TrimSpace(x)
+		if x != "" {
+			wlData += x + " IN CNAME rpz-passthru.\n*." + x + " IN CNAME rpz-passthru.\n"
+		}
+	}
+	os.WriteFile("/etc/powerdns/custom_whitelist.zone", []byte(wlData), 0644)
+	
+	// Command PowerDNS to reload RPZ silently (without dropping packets)
+	exec.Command("rec_control", "reload-zones").Run()
 }
 
 func SearchRPZ(c *fiber.Ctx) error {
