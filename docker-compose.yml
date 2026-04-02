@@ -5,9 +5,8 @@ services:
     build: .
     container_name: netshield-v2
     restart: always
-    # Host Network Mode: Eliminasi Docker NAT proxy overhead.
-    # Paket UDP langsung menyentuh kernel tanpa perantara.
-    # Wajib untuk mencapai 126k+ QPS!
+    # Host Networking: eliminasi Docker NAT overhead
+    # Sysctl tuning dilakukan oleh deploy.sh di level OS
     network_mode: host
     tmpfs:
       - /var/log/netshield
@@ -15,14 +14,5 @@ services:
       nofile:
         soft: 1048576
         hard: 1048576
-    sysctls:
-      # Perbesar buffer penerimaan/pengiriman UDP (16MB)
-      net.core.rmem_max: 16777216
-      net.core.rmem_default: 8388608
-      net.core.wmem_max: 16777216
-      net.core.wmem_default: 8388608
-      # Perbesar antrian backlog jaringan
-      net.core.netdev_max_backlog: 65536
-      net.core.somaxconn: 65536
     volumes:
       - ./data:/data
