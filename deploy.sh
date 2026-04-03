@@ -120,55 +120,23 @@ sleep 5
 # ──────────────────────────────────────────────────────────
 echo "[7/7] XDP/eBPF Kernel Bypass ..."
 
-# Mount BPF filesystem jika belum
-mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true
-
-# Cek apakah XDP tersedia di dalam container
-XDP_RESULT=$(docker exec netshield-v2 sh -c '
-    if [ -f /etc/xdp/dns_filter.o ] && [ -s /etc/xdp/dns_filter.o ]; then
-        # Deteksi interface utama
-        IFACE=$(ip route show default 2>/dev/null | awk "{print \$5}" | head -1)
-        if [ -z "$IFACE" ]; then
-            IFACE=$(ip -o link show up | grep -v "lo:" | awk -F": " "{print \$2}" | head -1)
-        fi
-
-        if [ -n "$IFACE" ]; then
-            # Mount BPF inside container
-            mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true
-
-            # Load XDP (generic mode untuk kompatibilitas KVM + Baremetal)
-            ip link set dev "$IFACE" xdpgeneric obj /etc/xdp/dns_filter.o sec xdp 2>&1 && \
-                echo "XDP_OK:$IFACE" || \
-                echo "XDP_FAIL:$IFACE"
-        else
-            echo "XDP_NO_IFACE"
-        fi
-    else
-        echo "XDP_NO_OBJ"
-    fi
-' 2>&1)
-
-case "$XDP_RESULT" in
-    *XDP_OK*)
-        IFACE=$(echo "$XDP_RESULT" | grep "XDP_OK" | cut -d: -f2)
-        echo "  -> ✅ XDP AKTIF pada interface: $IFACE"
+# Eksekusi setup XDP di level host (butuh clang & bpftool)
+if [ -f "./xdp/setup_xdp_host.sh" ]; then
+    echo "  -> Kompilasi & Loading XDP via kernel host..."
+    if bash ./xdp/setup_xdp_host.sh > /tmp/xdp_deploy.log 2>&1; then
+        echo "  -> ✅ XDP AKTIF! BPF Maps telah di-pin."
         echo "  -> Domain terblokir di-drop di level NIC (0 CPU cost)"
-        ;;
-    *XDP_FAIL*)
-        echo "  -> ⚠️  XDP gagal dimuat (kernel mungkin terlalu lama)"
-        echo "  -> Sistem tetap berjalan normal tanpa XDP"
-        ;;
-    *XDP_NO_OBJ*)
-        echo "  -> ℹ️  XDP binary tidak tersedia (kompilasi dilewati)"
-        echo "  -> Sistem berjalan normal tanpa kernel bypass"
-        ;;
-    *XDP_NO_IFACE*)
-        echo "  -> ⚠️  Interface jaringan tidak terdeteksi"
-        ;;
-    *)
-        echo "  -> ℹ️  XDP: $XDP_RESULT"
-        ;;
-esac
+        XDP_STATUS="AKTIF ✅"
+    else
+        echo "  -> ⚠️  Kompilasi/Load XDP gagal."
+        echo "  -> Cek /tmp/xdp_deploy.log untuk detail."
+        echo "  -> Sistem tetap berjalan normal tanpa XDP."
+        XDP_STATUS="Gagal"
+    fi
+else
+    echo "  -> ⚠️  File setup_xdp_host.sh tidak ditemukan."
+    XDP_STATUS="Tidak ditemukan"
+fi
 
 echo ""
 echo "════════════════════════════════════════════════════════════"

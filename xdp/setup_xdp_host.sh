@@ -129,7 +129,14 @@ cd /tmp && clang -O2 -g -target bpf -c dns_xdp.c -o dns_xdp.o || { echo "[XDP] �
 
 echo "[XDP] Loading pada enp2s0..."
 ip link set dev enp2s0 xdp off 2>/dev/null || true
-ip link set dev enp2s0 xdpgeneric obj /tmp/dns_xdp.o sec xdp && \
-    echo "[XDP] ✅ XDP AKTIF!" || \
+ip link set dev enp2s0 xdpgeneric obj /tmp/dns_xdp.o sec xdp && {
+    echo "[XDP] ✅ XDP AKTIF!"
+    echo "[XDP] Memasangi BPF Maps (Pinning)..."
+    rm -f /sys/fs/bpf/blocked_domains /sys/fs/bpf/xdp_stats
+    bpftool map pin name blocked_domains /sys/fs/bpf/blocked_domains
+    bpftool map pin name xdp_stats /sys/fs/bpf/xdp_stats
+} || {
     echo "[XDP] ❌ XDP gagal dimuat"
+    exit 1
+}
 ip link show enp2s0 | head -2
