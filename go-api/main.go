@@ -196,6 +196,9 @@ func main() {
 	admin.Get("/top-domains", GetTopDomains)
 	admin.Get("/upstream-health", GetUpstreamHealth)
 
+	admin.Get("/xdp/stats", GetXDPStatsAPI)
+	admin.Post("/xdp/toggle", ToggleXDP)
+
 	// Serve Static Frontend
 
 	app.Static("/", "/var/www/html/")
@@ -964,6 +967,17 @@ func syncRPZWorker() {
 				// Signal PowerDNS to instantly reload latest compiled policies
 				exec.Command("rec_control", "reload-lua-config").Run()
 				exec.Command("rec_control", "wipe-cache", "$").Run()
+
+				// Sinkronisasi ke XDP BPF Map (jika XDP aktif)
+				// Domain terblokir akan di-DROP di level NIC!
+				if isXDPActive() {
+					var xdpDomains []string
+					for d := range finalDomains {
+						xdpDomains = append(xdpDomains, d)
+					}
+					go syncDomainsToXDP(xdpDomains)
+					log.Printf("[RPZ Worker] XDP sync initiated for %d domains", len(xdpDomains))
+				}
 			}
 		}
 		

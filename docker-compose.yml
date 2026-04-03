@@ -8,6 +8,9 @@ services:
     # Host Networking: eliminasi Docker NAT overhead
     # Sysctl tuning dilakukan oleh deploy.sh di level OS
     network_mode: host
+    # Privileged mode diperlukan untuk XDP/eBPF
+    # (load BPF programs ke kernel + akses /sys/fs/bpf)
+    privileged: true
     tmpfs:
       - /var/log/netshield
     ulimits:
@@ -16,3 +19,4 @@ services:
         hard: 1048576
     volumes:
       - ./data:/data
+      - /sys/fs/bpf:/sys/fs/bpf
