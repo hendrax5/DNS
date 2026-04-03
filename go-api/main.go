@@ -126,6 +126,8 @@ func main() {
 	go streamLogs()
 	go systemTelemetryWorker()
 	go liveQPSWorker()
+	go prefetchWorker()
+	go upstreamScoringWorker()
 
 	app := fiber.New(fiber.Config{
 		ServerHeader: "NetShield DNS",
@@ -190,6 +192,9 @@ func main() {
 
 	admin.Get("/upstream", GetUpstreamConfig)
 	admin.Post("/upstream", SaveUpstreamConfig)
+
+	admin.Get("/top-domains", GetTopDomains)
+	admin.Get("/upstream-health", GetUpstreamHealth)
 
 	// Serve Static Frontend
 
@@ -1495,4 +1500,169 @@ func systemTelemetryWorker() {
 		}
 		metricsMutex.Unlock()
 	}
+}
+
+// ══════════════════════════════════════════════════════════
+// MODUL: Domain Prefetch Engine
+// Mengambil ulang domain populer SEBELUM cache-nya kedaluwarsa
+// ══════════════════════════════════════════════════════════
+
+func prefetchWorker() {
+	time.Sleep(60 * time.Second) // tunggu sistem stabil
+
+	for {
+		metricsMutex.RLock()
+		// Kumpulkan top 200 domain yang paling sering diakses
+		type domCount struct {
+			Domain string
+			Count  int
+		}
+		var sorted []domCount
+		for dom, count := range topAllowedDomains {
+			sorted = append(sorted, domCount{dom, count})
+		}
+		metricsMutex.RUnlock()
+
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i].Count > sorted[j].Count })
+
+		limit := 200
+		if len(sorted) < limit {
+			limit = len(sorted)
+		}
+
+		// Lakukan prefetch menggunakan dig (memaksa PowerDNS me-refresh cache)
+		for i := 0; i < limit; i++ {
+			dom := strings.TrimSuffix(sorted[i].Domain, ".")
+			if dom == "" { continue }
+			exec.Command("dig", "@127.0.0.1", "-p", "5353", dom, "+short", "+time=1", "+tries=1").Run()
+		}
+
+		log.Printf("[Prefetch] Warmed %d top domains", limit)
+		time.Sleep(120 * time.Second) // prefetch setiap 2 menit
+	}
+}
+
+// ══════════════════════════════════════════════════════════
+// MODUL: Upstream Health Scoring
+// Mengukur latensi upstream resolvers dan mendeteksi degradasi
+// ══════════════════════════════════════════════════════════
+
+type UpstreamScore struct {
+	IP      string  `json:"ip"`
+	Latency float64 `json:"latency_ms"`
+	Status  string  `json:"status"`
+	Score   int     `json:"score"`
+}
+
+var (
+	upstreamScores     []UpstreamScore
+	upstreamScoreMutex sync.RWMutex
+)
+
+func upstreamScoringWorker() {
+	for {
+		var resolvers string
+		db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_resolvers'").Scan(&resolvers)
+
+		var scores []UpstreamScore
+		for _, ip := range strings.Split(resolvers, ",") {
+			ip = strings.TrimSpace(ip)
+			if ip == "" { continue }
+
+			start := time.Now()
+			cmd := exec.Command("dig", "@"+ip, "google.com", "+short", "+time=2", "+tries=1")
+			err := cmd.Run()
+			latency := time.Since(start).Seconds() * 1000
+
+			score := 100
+			status := "EXCELLENT"
+			if err != nil {
+				score = 0
+				status = "UNREACHABLE"
+				latency = 9999
+			} else if latency > 100 {
+				score = 30
+				status = "SLOW"
+			} else if latency > 50 {
+				score = 60
+				status = "FAIR"
+			} else if latency > 20 {
+				score = 80
+				status = "GOOD"
+			}
+
+			scores = append(scores, UpstreamScore{
+				IP:      ip,
+				Latency: math.Round(latency*100) / 100,
+				Status:  status,
+				Score:   score,
+			})
+		}
+
+		upstreamScoreMutex.Lock()
+		upstreamScores = scores
+		upstreamScoreMutex.Unlock()
+
+		// Jika upstream terbaik berubah, reorder di forward_zones.txt
+		if len(scores) > 1 {
+			sort.Slice(scores, func(i, j int) bool { return scores[i].Score > scores[j].Score })
+			var bestIPs []string
+			for _, s := range scores {
+				if s.Score > 0 { bestIPs = append(bestIPs, s.IP) }
+			}
+			if len(bestIPs) > 0 {
+				var enabled string
+				db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_forwarding_enabled'").Scan(&enabled)
+				if enabled == "true" {
+					db.Exec("UPDATE settings SET value = ? WHERE key = 'upstream_resolvers'", strings.Join(bestIPs, ","))
+					generateForwardersConfig()
+					exec.Command("rec_control", "reload-zones").Run()
+					log.Printf("[UpstreamScore] Reordered: %v", bestIPs)
+				}
+			}
+		}
+
+		time.Sleep(60 * time.Second) // scoring setiap 1 menit
+	}
+}
+
+// ══════════════════════════════════════════════════════════
+// API: Top Domains (untuk dasar optimasi & prefetch monitoring)
+// ══════════════════════════════════════════════════════════
+
+func GetTopDomains(c *fiber.Ctx) error {
+	metricsMutex.RLock()
+	defer metricsMutex.RUnlock()
+
+	type DomEntry struct {
+		Domain string `json:"domain"`
+		Count  int    `json:"count"`
+	}
+
+	var allowed, blocked []DomEntry
+	for dom, count := range topAllowedDomains {
+		allowed = append(allowed, DomEntry{dom, count})
+	}
+	for dom, count := range topBlockedDomains {
+		blocked = append(blocked, DomEntry{dom, count})
+	}
+
+	sort.Slice(allowed, func(i, j int) bool { return allowed[i].Count > allowed[j].Count })
+	sort.Slice(blocked, func(i, j int) bool { return blocked[i].Count > blocked[j].Count })
+
+	if len(allowed) > 50 { allowed = allowed[:50] }
+	if len(blocked) > 50 { blocked = blocked[:50] }
+
+	return c.JSON(fiber.Map{
+		"top_allowed": allowed,
+		"top_blocked": blocked,
+		"prefetch_pool_size": len(topAllowedDomains),
+	})
+}
+
+// API: Upstream Health Scores
+func GetUpstreamHealth(c *fiber.Ctx) error {
+	upstreamScoreMutex.RLock()
+	defer upstreamScoreMutex.RUnlock()
+	return c.JSON(fiber.Map{"scores": upstreamScores})
 }
