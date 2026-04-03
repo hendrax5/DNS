@@ -1,9 +1,9 @@
 // NetShield XDP DNS Filter — Kernel-Level Packet Interception
-// 100% Self-Contained: Tidak bergantung pada header sistem apapun.
+// 100% Self-Contained + Legacy Map Format (kompatibel semua kernel 4.10+)
 // Kompilasi: clang -O2 -target bpf -c dns_filter.c -o dns_filter.o
 
 // ══════════════════════════════════════════════════════════
-// TIPE DATA KERNEL (manual, agar portabel di semua arsitektur)
+// TIPE DATA KERNEL
 // ══════════════════════════════════════════════════════════
 typedef unsigned char      __u8;
 typedef unsigned short     __u16;
@@ -14,27 +14,25 @@ typedef __u32 __be32;
 typedef int   __s32;
 
 // ══════════════════════════════════════════════════════════
-// KONSTANTA BPF (dari linux/bpf.h)
+// KONSTANTA BPF
 // ══════════════════════════════════════════════════════════
 enum xdp_action {
-    XDP_ABORTED = 0,
-    XDP_DROP,
-    XDP_PASS,
-    XDP_TX,
-    XDP_REDIRECT,
+    XDP_ABORTED = 0, XDP_DROP, XDP_PASS, XDP_TX, XDP_REDIRECT,
 };
 
-enum bpf_map_type {
-    BPF_MAP_TYPE_UNSPEC = 0,
-    BPF_MAP_TYPE_HASH,
-    BPF_MAP_TYPE_ARRAY,
-};
+#define BPF_MAP_TYPE_HASH  1
+#define BPF_MAP_TYPE_ARRAY 2
 
-// BPF Helper functions
+// BPF Helper IDs
 static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *)1;
 
+#define SEC(name) __attribute__((section(name), used))
+
+static __u16 bpf_htons(__u16 x) { return __builtin_bswap16(x); }
+static __u16 bpf_ntohs(__u16 x) { return __builtin_bswap16(x); }
+
 // ══════════════════════════════════════════════════════════
-// STRUKTUR PAKET JARINGAN (dari linux/if_ether.h, linux/ip.h, linux/udp.h)
+// STRUKTUR PAKET JARINGAN
 // ══════════════════════════════════════════════════════════
 #define ETH_P_IP    0x0800
 #define ETH_ALEN    6
@@ -70,9 +68,6 @@ struct udphdr {
     __be16 check;
 } __attribute__((packed));
 
-// ══════════════════════════════════════════════════════════
-// XDP CONTEXT & MAKRO BPF
-// ══════════════════════════════════════════════════════════
 struct xdp_md {
     __u32 data;
     __u32 data_end;
@@ -81,33 +76,36 @@ struct xdp_md {
     __u32 rx_queue_index;
 };
 
-#define SEC(name) __attribute__((section(name), used))
-#define __uint(name, val)  int (*name)[val]
-#define __type(name, val)  typeof(val) *name
-
-static __u16 bpf_htons(__u16 x) { return __builtin_bswap16(x); }
-static __u16 bpf_ntohs(__u16 x) { return __builtin_bswap16(x); }
-
 // ══════════════════════════════════════════════════════════
-// BPF MAPS
+// BPF MAPS (LEGACY FORMAT — kompatibel semua iproute2)
 // ══════════════════════════════════════════════════════════
+struct bpf_map_def {
+    unsigned int type;
+    unsigned int key_size;
+    unsigned int value_size;
+    unsigned int max_entries;
+    unsigned int map_flags;
+};
+
 #define DNS_PORT 53
 
 // Map: FNV-1a hash domain → 1 (blocked). 20 juta entri.
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 20000000);
-    __type(key, __u64);
-    __type(value, __u8);
-} blocked_domains SEC(".maps");
+struct bpf_map_def SEC("maps") blocked_domains = {
+    .type        = BPF_MAP_TYPE_HASH,
+    .key_size    = sizeof(__u64),
+    .value_size  = sizeof(__u8),
+    .max_entries = 20000000,
+    .map_flags   = 0,
+};
 
-// Map: Statistik counter
-struct {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 3);
-    __type(key, __u32);
-    __type(value, __u64);
-} xdp_stats SEC(".maps");
+// Map: Statistik counter (3 entries: pass, blocked, total)
+struct bpf_map_def SEC("maps") xdp_stats = {
+    .type        = BPF_MAP_TYPE_ARRAY,
+    .key_size    = sizeof(__u32),
+    .value_size  = sizeof(__u64),
+    .max_entries = 3,
+    .map_flags   = 0,
+};
 
 #define STAT_PASS    0
 #define STAT_BLOCKED 1
