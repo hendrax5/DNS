@@ -125,7 +125,7 @@ char _license[] SEC("license") = "GPL";
 EOF
 
 echo "[XDP] Compiling..."
-cd /tmp && clang -O2 -g -target bpf -c dns_xdp.c -o dns_xdp.o 2>&1 | grep -v "loop not unrolled"
+cd /tmp && clang -O2 -g -target bpf -c dns_xdp.c -o dns_xdp.o || { echo "[XDP] ❌ Compile failed!"; exit 1; }
 
 echo "[XDP] Loading pada enp2s0..."
 ip link set dev enp2s0 xdp off 2>/dev/null || true
