@@ -23,6 +23,7 @@ import {
   ShieldBan
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import Zones from './pages/Zones';
 
 function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -627,6 +628,7 @@ function App() {
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-4">
               <button onClick={() => setAdminTab('threats')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'threats' ? 'bg-fuchsia-600 text-white shadow-[0_0_15px_rgba(192,38,211,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldAlert className="w-4 h-4 inline-block mr-2" />Intelijen Ancaman & RPZ</button>
               <button onClick={() => setAdminTab('forwarding')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'forwarding' ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />Penerusan Global</button>
+              <button onClick={() => setAdminTab('zones')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'zones' ? 'bg-cyan-600 text-white shadow-[0_0_15px_rgba(8,145,178,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Database className="w-4 h-4 inline-block mr-2" />Local/Auth Zones</button>
               <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Kontrol Akses</button>
               <button onClick={() => setAdminTab('options')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'options' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Server className="w-4 h-4 inline-block mr-2" />Opsi Keamanan</button>
             </div>
@@ -917,6 +919,13 @@ function App() {
                 </div>
               </div>
               </>
+              )}
+
+              {/* === TAB: ZONES === */}
+              {adminTab === 'zones' && (
+                <div className="lg:col-span-3">
+                  <Zones apiFetch={apiFetch} setSaveStatus={setSaveStatus} />
+                </div>
               )}
 
               {/* === TAB: ACCESS CONTROL === */}

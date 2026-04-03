@@ -199,6 +199,15 @@ func main() {
 	admin.Get("/xdp/stats", GetXDPStatsAPI)
 	admin.Post("/xdp/toggle", ToggleXDP)
 
+	// Zones Management
+	admin.Get("/zones", GetZones)
+	admin.Post("/zones", AddZone)
+	admin.Delete("/zones/:id", DeleteZone)
+	
+	// Zone Records
+	admin.Post("/records", AddRecord)
+	admin.Delete("/records/:id", DeleteRecord)
+
 	// Serve Static Frontend
 
 	app.Static("/", "/var/www/html/")
@@ -225,6 +234,19 @@ func initDB() {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		email TEXT UNIQUE NOT NULL,
 		password_hash TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS zones (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		domain TEXT UNIQUE NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS zone_records (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		zone_id INTEGER,
+		type TEXT NOT NULL,
+		name TEXT NOT NULL,
+		content TEXT NOT NULL,
+		ttl INTEGER DEFAULT 3600,
+		FOREIGN KEY(zone_id) REFERENCES zones(id) ON DELETE CASCADE
 	);`
 	_, err = db.Exec(createTableSQL)
 	if err != nil {
@@ -754,42 +776,70 @@ func SaveForwarders(c *fiber.Ctx) error {
 }
 
 func GetUpstreamConfig(c *fiber.Ctx) error {
-	var enabled, resolvers string
-	db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_forwarding_enabled'").Scan(&enabled)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'upstream_resolvers'").Scan(&resolvers)
+	var fwds string
+	db.QueryRow(`SELECT value FROM settings WHERE key = 'parent_resolvers'`).Scan(&fwds)
 	
-	resolverList := []string{}
-	for _, r := range strings.Split(resolvers, ",") {
-		r = strings.TrimSpace(r)
-		if r != "" { resolverList = append(resolverList, r) }
+	fwdList := []string{}
+	for _, f := range strings.Split(fwds, ",") {
+		if strings.TrimSpace(f) != "" {
+			fwdList = append(fwdList, strings.TrimSpace(f))
+		}
 	}
-	
+
+	var dnssecStr, dohStr, dotStr string
+	db.QueryRow(`SELECT value FROM settings WHERE key = 'dnssec_enabled'`).Scan(&dnssecStr)
+	db.QueryRow(`SELECT value FROM settings WHERE key = 'doh_enabled'`).Scan(&dohStr)
+	db.QueryRow(`SELECT value FROM settings WHERE key = 'dot_enabled'`).Scan(&dotStr)
+
 	return c.JSON(fiber.Map{
-		"enabled":   enabled == "true",
-		"resolvers": resolverList,
+		"forwarders": fwdList,
+		"dnssec":     dnssecStr == "true",
+		"doh":        dohStr == "true",
+		"dot":        dotStr == "true",
 	})
 }
 
 func SaveUpstreamConfig(c *fiber.Ctx) error {
 	var req struct {
-		Enabled   bool     `json:"enabled"`
-		Resolvers []string `json:"resolvers"`
+		Forwarders []string `json:"forwarders"`
+		DNSSEC     bool     `json:"dnssec"`
+		DoH        bool     `json:"doh"`
+		DoT        bool     `json:"dot"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	enabledStr := "false"
-	if req.Enabled { enabledStr = "true" }
+	fwds := strings.Join(req.Forwarders, ",")
+	dnssecStr := "false"
+	if req.DNSSEC {
+		dnssecStr = "true"
+	}
+	dohStr := "false"
+	if req.DoH {
+		dohStr = "true"
+	}
+	dotStr := "false"
+	if req.DoT {
+		dotStr = "true"
+	}
+
+	db.Exec(`UPDATE settings SET value = ? WHERE key = 'parent_resolvers'`, fwds)
+	db.Exec(`INSERT OR REPLACE INTO settings (key, value) VALUES ('parent_resolvers', ?)`, fwds)
 	
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'upstream_forwarding_enabled'", enabledStr)
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'upstream_resolvers'", strings.Join(req.Resolvers, ","))
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('dnssec_enabled', ?)`, dnssecStr)
+	db.Exec(`UPDATE settings SET value = ? WHERE key = 'dnssec_enabled'`, dnssecStr)
+	
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('doh_enabled', ?)`, dohStr)
+	db.Exec(`UPDATE settings SET value = ? WHERE key = 'doh_enabled'`, dohStr)
+	
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('dot_enabled', ?)`, dotStr)
+	db.Exec(`UPDATE settings SET value = ? WHERE key = 'dot_enabled'`, dotStr)
 
-	generateForwardersConfig()
-	exec.Command("rec_control", "reload-zones").Run()
-	exec.Command("rec_control", "wipe-cache", "$").Run()
+	// Call Configuration Template Engine
+	go GenerateConfigs()
 
-	return c.JSON(fiber.Map{"message": "Upstream forwarding configuration updated"})
+	return c.JSON(fiber.Map{"status": "success", "message": "Upstream config saved, backend reloading..."})
 }
 
 func syncRPZWorker() {
