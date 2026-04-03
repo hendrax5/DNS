@@ -10,17 +10,19 @@ WORKDIR /app
 COPY frontend/ .
 RUN npm install && npm run build
 
-# Stage 3: Compile XDP/eBPF filter (kernel bypass DNS filter)
-FROM alpine:latest AS xdp-builder
-RUN apk add --no-cache clang llvm lld musl-dev linux-headers libbpf-dev
+# Stage 3: Compile XDP/eBPF filter (Ubuntu has better BPF header support)
+FROM ubuntu:22.04 AS xdp-builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang llvm libbpf-dev linux-headers-generic gcc-multilib \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /xdp
 COPY xdp/dns_filter.c .
 # Kompilasi ke eBPF bytecode (portable, berjalan di semua kernel 4.10+)
 RUN clang -O2 -g -target bpf \
     -D__TARGET_ARCH_x86 \
-    -I/usr/include \
-    -c dns_filter.c -o dns_filter.o 2>/dev/null || \
-    echo "XDP compilation skipped (optional)" && touch dns_filter.o
+    -I/usr/include/x86_64-linux-gnu \
+    -c dns_filter.c -o dns_filter.o || \
+    (echo "⚠️ XDP compilation failed, creating placeholder" && touch dns_filter.o)
 
 
 # Final Stage: PowerDNS + Supervisord + XDP
