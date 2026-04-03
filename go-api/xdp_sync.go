@@ -21,14 +21,25 @@ const (
 	fnvPrime       = uint64(0x100000001b3)
 )
 
-// domainFNV1a menghitung FNV-1a hash dari nama domain (lowercase)
-// Harus IDENTIK dengan implementasi di xdp/dns_filter.c
+// domainFNV1a menghitung FNV-1a hash dari nama domain dalam DNS wire format
+// Wire format: "google.com" → \x06google\x03com (tanpa null terminator)
+// Harus IDENTIK dengan flat loop di xdp/setup_xdp_host.sh
 func domainFNV1a(domain string) uint64 {
 	domain = strings.TrimSuffix(strings.ToLower(domain), ".")
+	// Convert ke wire format dan hash setiap byte
+	parts := strings.Split(domain, ".")
 	hash := fnvOffsetBasis
-	for i := 0; i < len(domain); i++ {
-		hash ^= uint64(domain[i])
+	for _, part := range parts {
+		// Hash length byte
+		hash ^= uint64(len(part))
 		hash *= fnvPrime
+		// Hash label bytes
+		for i := 0; i < len(part); i++ {
+			c := part[i]
+			if c >= 'A' && c <= 'Z' { c += 32 }
+			hash ^= uint64(c)
+			hash *= fnvPrime
+		}
 	}
 	return hash
 }
