@@ -742,6 +742,12 @@ func GetForwarders(c *fiber.Ctx) error {
 	var parResStr string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'parent_resolvers'").Scan(&parResStr)
 	
+	var resMode string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'resolver_mode'").Scan(&resMode)
+	if resMode == "" {
+		resMode = "hybrid"
+	}
+
 	parRes := []string{"", "", "", "", "", ""}
 	if parResStr != "" {
 		parts := strings.Split(parResStr, ",")
@@ -755,22 +761,41 @@ func GetForwarders(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"domain_forwarders": domFwd,
 		"parent_resolvers":  parRes,
+		"resolver_mode":     resMode,
 	})
 }
 
 func SaveForwarders(c *fiber.Ctx) error {
-	var req ForwarderRequest
+	var req struct {
+		DomainForwarders string   `json:"domain_forwarders"`
+		ParentResolvers  []string `json:"parent_resolvers"`
+		ResolverMode     string   `json:"resolver_mode"`
+	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'domain_forwarders'", req.DomainForwarders)
-	parResStr := strings.Join(req.ParentResolvers, ",")
+	
+	validP := []string{}
+	for _, p := range req.ParentResolvers {
+		if strings.TrimSpace(p) != "" {
+			validP = append(validP, strings.TrimSpace(p))
+		}
+	}
+	parResStr := strings.Join(validP, ",")
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'parent_resolvers'", parResStr)
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('parent_resolvers', ?)", parResStr)
+
+	resMode := req.ResolverMode
+	if resMode != "root_only" && resMode != "forward_only" && resMode != "hybrid" {
+		resMode = "hybrid"
+	}
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'resolver_mode'", resMode)
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('resolver_mode', ?)", resMode)
 
 	generateForwardersConfig()
-	exec.Command("rec_control", "reload-zones").Run()
-	exec.Command("rec_control", "wipe-cache", "$").Run()
+	go GenerateConfigs()
 
 	return c.JSON(fiber.Map{"message": "Forwarders updated successfully"})
 }
@@ -786,16 +811,22 @@ func GetUpstreamConfig(c *fiber.Ctx) error {
 		}
 	}
 
-	var dnssecStr, dohStr, dotStr string
+	var dnssecStr, dohStr, dotStr, resolverMode string
 	db.QueryRow(`SELECT value FROM settings WHERE key = 'dnssec_enabled'`).Scan(&dnssecStr)
 	db.QueryRow(`SELECT value FROM settings WHERE key = 'doh_enabled'`).Scan(&dohStr)
 	db.QueryRow(`SELECT value FROM settings WHERE key = 'dot_enabled'`).Scan(&dotStr)
+	db.QueryRow(`SELECT value FROM settings WHERE key = 'resolver_mode'`).Scan(&resolverMode)
+	
+	if resolverMode == "" {
+		resolverMode = "hybrid"
+	}
 
 	return c.JSON(fiber.Map{
 		"forwarders": fwdList,
 		"dnssec":     dnssecStr == "true",
 		"doh":        dohStr == "true",
 		"dot":        dotStr == "true",
+		"resolver_mode": resolverMode,
 	})
 }
 
@@ -805,6 +836,7 @@ func SaveUpstreamConfig(c *fiber.Ctx) error {
 		DNSSEC     bool     `json:"dnssec"`
 		DoH        bool     `json:"doh"`
 		DoT        bool     `json:"dot"`
+		ResolverMode string `json:"resolver_mode"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
@@ -823,6 +855,10 @@ func SaveUpstreamConfig(c *fiber.Ctx) error {
 	if req.DoT {
 		dotStr = "true"
 	}
+	rMode := req.ResolverMode
+	if rMode != "root_only" && rMode != "forward_only" && rMode != "hybrid" {
+		rMode = "hybrid"
+	}
 
 	db.Exec(`UPDATE settings SET value = ? WHERE key = 'parent_resolvers'`, fwds)
 	db.Exec(`INSERT OR REPLACE INTO settings (key, value) VALUES ('parent_resolvers', ?)`, fwds)
@@ -835,6 +871,9 @@ func SaveUpstreamConfig(c *fiber.Ctx) error {
 	
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('dot_enabled', ?)`, dotStr)
 	db.Exec(`UPDATE settings SET value = ? WHERE key = 'dot_enabled'`, dotStr)
+
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('resolver_mode', ?)`, rMode)
+	db.Exec(`UPDATE settings SET value = ? WHERE key = 'resolver_mode'`, rMode)
 
 	// Call Configuration Template Engine
 	go GenerateConfigs()

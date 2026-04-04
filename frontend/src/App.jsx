@@ -88,6 +88,7 @@ function App() {
   const [syncInterval, setSyncInterval] = useState(1);
   const [domainForwarders, setDomainForwarders] = useState('');
   const [parentResolvers, setParentResolvers] = useState(['', '', '', '', '', '']);
+  const [resolverMode, setResolverMode] = useState('hybrid');
   const [saveStatus, setSaveStatus] = useState({ show: false, message: '', type: '' });
   const [topAnalytics, setTopAnalytics] = useState({ clients: [], allowed: [], blocked: [] });
   const [digHealth, setDigHealth] = useState([]);
@@ -176,6 +177,7 @@ function App() {
       const dataFwd = await resFwd.json();
       if(dataFwd.domain_forwarders !== undefined) setDomainForwarders(dataFwd.domain_forwarders);
       if(dataFwd.parent_resolvers) setParentResolvers(dataFwd.parent_resolvers);
+      if(dataFwd.resolver_mode) setResolverMode(dataFwd.resolver_mode);
 
       const resAdv = await apiFetch('/api/advanced-config');
       const dataAdv = await resAdv.json();
@@ -303,10 +305,11 @@ function App() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
            domain_forwarders: domainForwarders,
-           parent_resolvers: parentResolvers
+           parent_resolvers: parentResolvers,
+           resolver_mode: resolverMode
         })
       });
-      showNotification('Forwarding rules synchronized successfully');
+      showNotification('Forwarding rules & Resolver Mode synchronized successfully');
     } catch(e) { showNotification('Failed to upload Forwarders', 'error'); }
   };
 
@@ -1194,10 +1197,28 @@ function App() {
                   </button>
                 </div>
                 
-                <div className="p-6 bg-slate-950/50 flex flex-col lg:flex-row gap-10 flex-1">
+                <div className="p-6 bg-slate-950/50 flex flex-col gap-8 flex-1">
+
+                  {/* Mode Resolusi */}
+                  <div className="bg-[#0b1120] border border-slate-800/80 p-5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-white tracking-widest uppercase mb-1">Strategi Resolusi DNS</label>
+                      <p className="text-xs text-slate-400">Tentukan cara server menangani nama domain yang tidak ada di cache lokal.</p>
+                    </div>
+                    <select 
+                      value={resolverMode} 
+                      onChange={(e) => setResolverMode(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 text-indigo-300 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full md:w-64 p-2.5 outline-none font-medium cursor-pointer"
+                    >
+                      <option value="root_only">1. Root Server (Authoritative Natively)</option>
+                      <option value="hybrid">2. Hibrid (Prioritas Forwarder + Fallback)</option>
+                      <option value="forward_only">3. Forward Only (Wajib Upstream)</option>
+                    </select>
+                  </div>
                   
-                  {/* Domain Forwarder */}
-                  <div className="flex-1 flex flex-col gap-2">
+                  <div className="flex flex-col lg:flex-row gap-10">
+                    {/* Domain Forwarder */}
+                    <div className="flex-1 flex flex-col gap-2">
                      <label className="block text-sm font-bold text-white tracking-widest uppercase">Domain Forwarder</label>
                      <p className="text-xs text-slate-400 mb-2 leading-relaxed">
                         Format: <code className="text-indigo-300 bg-indigo-900/30 px-1 py-0.5 rounded">domain_name,ip_resolver1,ip_resolver2,...</code><br/>
@@ -1238,8 +1259,8 @@ function App() {
                            </div>
                         ))}
                      </div>
+                    </div>
                   </div>
-
                 </div>
               </div>
               </>
