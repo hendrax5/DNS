@@ -76,11 +76,10 @@ func generateRecursorConf(dnssec bool, forwarders string, authZones string, reso
 
 	// Evaluate forward-zones-recurse
 	forwardZoneConfig := ""
-	if resolverMode != "root_only" {
+	if resolverMode == "forward_only" {
 		// Clean up forwarders list to ensure spaces
 		forwardersClean := strings.ReplaceAll(forwarders, ",", ", ")
 		
-		// If ANY forwarder contains :853, we strip it out from recursor.conf because dnsdist handles DoT
 		finalForwarders := []string{}
 		for _, f := range strings.Split(forwardersClean, ",") {
 			fw := strings.TrimSpace(f)
@@ -92,7 +91,6 @@ func generateRecursorConf(dnssec bool, forwarders string, authZones string, reso
 		if len(finalForwarders) > 0 {
 			forwardZoneConfig = fmt.Sprintf("forward-zones-recurse=.=%s", strings.Join(finalForwarders, ", "))
 		}
-		// If all forwarders were :853, forwardZoneConfig remains empty, recursor goes to roots as fallback, but dnsdist catches it first!
 	}
 
 	authZoneLine := ""
@@ -154,49 +152,44 @@ addDOHLocal("0.0.0.0:443", "/etc/ssl/certs/cert.pem", "/etc/ssl/private/key.pem"
 	}
 
 	content += `
--- Upstream powerdns recursor
-newServer({address="127.0.0.1:5354", pool="auth_and_recursor"})
+-- Define Server Policy
+setServerPolicy(firstAvailable) -- Prioritize order=1 (Local Root), then order=2 (Forwarders)
+
+-- Upstream powerdns recursor (Root Natively)
+newServer({address="127.0.0.1:5354", pool="main_pool", order=1})
 `
 
-	// Catch DoT upstreams (e.g., 1.1.1.1:853)
-	if resolverMode != "root_only" {
-		dotServers := []string{}
+	if resolverMode == "forward_only" || resolverMode == "hybrid" {
 		for _, f := range strings.Split(forwarders, ",") {
 			fw := strings.TrimSpace(f)
-			if strings.Contains(fw, ":853") {
-				dotServers = append(dotServers, fw)
+			if fw != "" {
+				poolName := "main_pool"
+				order := "2" // Hybrid uses forwarders as fallback/second-choice
+				
+				if resolverMode == "forward_only" {
+					order = "1" // Forward Only makes them primary
+					// We can technically just place it in dot_upstream, but we unified it to main_pool
+				}
+				
+				if strings.Contains(fw, ":853") {
+					content += fmt.Sprintf("newServer({address=\"%s\", tls=\"openssl\", pool=\"%s\", order=%s})\n", fw, poolName, order)
+				} else if resolverMode == "hybrid" {
+					// Add plain forwarders to dnsdist in hybrid mode
+					content += fmt.Sprintf("newServer({address=\"%s\", pool=\"%s\", order=%s})\n", fw, poolName, order)
+				}
 			}
 		}
-
-		if len(dotServers) > 0 {
-			content += "\n-- Outgoing Upstream DNS-over-TLS (DoT)\n"
-			for _, ds := range dotServers {
-				content += fmt.Sprintf("newServer({address=\"%s\", tls=\"openssl\", pool=\"dot_upstream\"})\n", ds)
-			}
-			
-			// If Hybrid mode, we still favor DoT but drop to recursor if DoT fails or if specific rule applies.
-			// But Dnsdist routing is typically sequential. 
-			// We can define a policy: Route to dot_upstream first.
-			if resolverMode == "forward_only" {
-				content += `
--- Forward Only: Route all external queries to DoT pool (Dnsdist handles it)
-addAction(AllRule(), PoolAction("dot_upstream"))
-`
-			} else if resolverMode == "hybrid" {
-				content += `
--- Hybrid Mode: Prioritize DoT pool
--- Fallback automatically to auth_and_recursor pool if DoT is down (handled by multiple pools or explicit Lua)
-addAction(AllRule(), PoolAction("dot_upstream"))
-addAction(AllRule(), PoolAction("auth_and_recursor"))
-`
-			}
-		} else {
-			// No explicit DoT servers detected, send everything to recursor
-			content += "\naddAction(AllRule(), PoolAction(\"auth_and_recursor\"))\n"
-		}
+	}
+	
+	if resolverMode == "forward_only" {
+		// If forward strictly, disable root server from pool
+		content += "\naddAction(AllRule(), PoolAction(\"main_pool\"))\n"
+	} else if resolverMode == "hybrid" {
+		// Hybrid uses main_pool (Root is order=1, Forwarders are order=2)
+		content += "\naddAction(AllRule(), PoolAction(\"main_pool\"))\n"
 	} else {
-		// Root Only: Send everything to local recursor
-		content += "\naddAction(AllRule(), PoolAction(\"auth_and_recursor\"))\n"
+		// Root Only
+		content += "\naddAction(AllRule(), PoolAction(\"main_pool\"))\n"
 	}
 
 	content += `
