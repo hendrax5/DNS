@@ -114,6 +114,17 @@ show_post_deploy() {
     fi
 
     echo ""
+    read -p "❓ Ingin mengaktifkan mode TProxy (Transparent DNS) secara langsung? (y/n): " toggle_tproxy
+    if [[ "$toggle_tproxy" == "y" || "$toggle_tproxy" == "Y" ]]; then
+        echo " ⏱️ Mengirim instruksi IPtables ke mesin isolasi..."
+        sleep 2
+        docker exec netshield-v2 curl -s -X POST -H "Content-Type: application/json" -d "{\"tproxy\":true}" http://127.0.0.1/api/cli-toggle-tproxy > /dev/null
+        echo " ✅ TProxy berhasil diaktifkan dengan rute NAT IPtables."
+    else
+        docker exec netshield-v2 curl -s -X POST -H "Content-Type: application/json" -d "{\"tproxy\":false}" http://127.0.0.1/api/cli-toggle-tproxy > /dev/null
+    fi
+
+    echo ""
     echo " 🔍 Memeriksa Status Layanan NetShield..."
     sleep 3
     # Menarik konfigurasi json dari backend lokal

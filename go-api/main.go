@@ -173,6 +173,26 @@ func main() {
 		return c.SendString("OK")
 	})
 
+	api.Post("/cli-toggle-tproxy", func(c *fiber.Ctx) error {
+		if c.IP() != "127.0.0.1" && c.IP() != "::1" {
+			return c.Status(403).SendString("Forbidden")
+		}
+		var req struct { Tproxy bool `json:"tproxy"` }
+		if err := c.BodyParser(&req); err != nil { return err }
+
+		tproxyStr := "false"
+		if req.Tproxy { tproxyStr = "true" }
+		db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
+
+		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+		if req.Tproxy {
+			exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+			exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+		}
+		return c.SendString("OK")
+	})
+
 	api.Post("/login", LoginHandler)
 	api.Get("/stats", GetPDNSStats)
     api.Get("/top-analytics", GetTopAnalytics)
