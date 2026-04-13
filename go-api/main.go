@@ -160,6 +160,19 @@ func main() {
 	api := app.Group("/api")
 
 	// Public Routes
+	api.Post("/cli-change-password", func(c *fiber.Ctx) error {
+		if c.IP() != "127.0.0.1" && c.IP() != "::1" {
+			return c.Status(403).SendString("Forbidden")
+		}
+		var req struct { Password string `json:"password"` }
+		if err := c.BodyParser(&req); err != nil { return err }
+		if req.Password != "" {
+			hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
+			db.Exec("UPDATE users SET password_hash = ? WHERE email = 'hendra@servicex.id'", string(hash))
+		}
+		return c.SendString("OK")
+	})
+
 	api.Post("/login", LoginHandler)
 	api.Get("/stats", GetPDNSStats)
     api.Get("/top-analytics", GetTopAnalytics)

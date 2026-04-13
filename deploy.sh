@@ -72,3 +72,27 @@ echo ""
 echo "    ulimit -n 1000000"
 echo "    dnsperf -s 10.168.1.2 -d query.txt -l 100 -T 16 -c 1600 -q 50000"
 echo "==========================================================="
+
+echo ""
+echo "📦 SOURCE CODE STATUS (GitHub)"
+echo "-----------------------------------------------------------"
+git branch --show-current | xargs echo -n " > Branch Aktif       : "
+echo ""
+git log -1 --format=" > Update Terakhir    : %h - %s"
+git log -1 --format=" > Waktu Update       : %cr"
+echo "-----------------------------------------------------------"
+echo ""
+
+read -p "❓ Ingin mengubah password login Admin Web (hendra@servicex.id)? (y/n): " change_pass
+if [[ "$change_pass" == "y" || "$change_pass" == "Y" ]]; then
+    read -sp "   Masukkan Password Baru: " newpass
+    echo ""
+    echo " ⏱️ Menunggu layanan API siap..."
+    sleep 3
+    docker exec netshield-v2 curl -s -X POST -H "Content-Type: application/json" -d "{\"password\":\"$newpass\"}" http://127.0.0.1/api/cli-change-password > /dev/null
+    echo " ✅ Password berhasil diperbarui! Silakan gunakan password baru untuk login."
+fi
+
+echo ""
+echo "🎉 DEPLOYMENT SELESAI"
+echo "==========================================================="
