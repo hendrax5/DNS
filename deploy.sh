@@ -127,8 +127,8 @@ show_post_deploy() {
     echo ""
     echo " 🔍 Memeriksa Status Layanan NetShield..."
     sleep 3
-    # Menarik konfigurasi json dari backend lokal
-    tproxy_status=$(docker exec netshield-v2 curl -s http://127.0.0.1/api/advanced-config | grep -o '"tproxy":[^,}]*' | cut -d':' -f2 | tr -d ' }')
+    # Menarik status tproxy dari database kontainer
+    tproxy_status=$(docker exec netshield-v2 sqlite3 /data/netshield.db "SELECT value FROM settings WHERE key='tproxy_enabled';" 2>/dev/null)
     
     if [[ "$tproxy_status" == "true" ]]; then
         echo " ✅ TPROXY VALIDASI : AKTIF (Transparent DNS Siap Menerima Trafik NAT)"

@@ -182,6 +182,7 @@ func main() {
 
 		tproxyStr := "false"
 		if req.Tproxy { tproxyStr = "true" }
+		db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('tproxy_enabled', 'false')")
 		db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
 
 		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
