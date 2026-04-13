@@ -1365,6 +1365,15 @@ func streamLogs() {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			flushBatch() // flush immediately on end-of-buffer wait
+
+			// Auto Truncate log file to prevent disk bloat 
+			// since we only keep statistics in memory
+			if info, err := file.Stat(); err == nil && info.Size() > 5*1024*1024 { // 5MB Limit
+				file.Truncate(0)
+				file.Seek(0, 0)
+				reader.Reset(file)
+			}
+
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
