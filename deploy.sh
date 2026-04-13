@@ -2,7 +2,7 @@
 # NetShield DNS - Deployment & QPS Tuning Script
 # Eksekusi dengan: sudo bash deploy.sh
 
-DIR="/home/hendra/DNS"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 show_header() {
     clear
