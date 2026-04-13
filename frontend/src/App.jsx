@@ -605,14 +605,17 @@ function App() {
                               </span>
                               <span className="text-slate-500 text-sm font-semibold mb-1">ms</span>
                            </div>
-                           <div className="mt-3 flex items-center gap-1.5">
-                               <span className="relative flex h-2 w-2">
-                                  <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${d.status === 'OK' ? 'animate-ping bg-emerald-400' : 'bg-rose-500'}`}></span>
-                                  <span className={`relative inline-flex rounded-full h-2 w-2 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                               </span>
-                               <span className={`text-[10px] font-bold tracking-wider uppercase ${d.status === 'OK' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                   {d.status === 'OK' ? 'RESOLVED' : 'TIMEOUT'}
-                               </span>
+                           <div className="mt-3 flex items-center justify-between gap-1.5 w-full">
+                               <div className="flex items-center gap-1.5">
+                                 <span className="relative flex h-2 w-2">
+                                    <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${d.status === 'OK' ? 'animate-ping bg-emerald-400' : 'bg-rose-500'}`}></span>
+                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${d.status === 'OK' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                 </span>
+                                 <span className={`text-[10px] font-bold tracking-wider uppercase ${d.status === 'OK' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                     {d.status === 'OK' ? 'RESOLVED' : 'TIMEOUT'}
+                                 </span>
+                               </div>
+                               {d.ping > 0 && <span className="text-[10px] text-slate-500 font-mono font-bold">ICMP: {d.ping}ms</span>}
                            </div>
                        </div>
                    ))}
@@ -622,16 +625,32 @@ function App() {
 
              <div className="flex flex-col gap-6">
                <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-lg">
-                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Top Access Blocked (Global Lists)</h3>
-                 <div className="space-y-3">
-                   {topAnalytics.blocked.map((d, i) => (
-                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-rose-900/30 hover:border-rose-800/50">
-                       <span className="text-rose-100 text-xs truncate pr-2 font-mono flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>{d.name}</span>
-                       <span className="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md text-xs border border-rose-500/20">{d.count.toLocaleString()} x</span>
+                  <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2"><Globe className="w-4 h-4 text-fuchsia-500"/> Domain Checker</h3>
+                  <form onSubmit={handleCheckDomain} className="flex items-center gap-3">
+                    <input 
+                      type="text" 
+                      value={checkDomainQuery}
+                      onChange={e => setCheckDomainQuery(e.target.value)}
+                      placeholder="misal. x.com" 
+                      className="flex-1 min-w-0 bg-[#0b1120] border border-slate-700/50 rounded-lg px-3 py-2 text-sm font-mono text-slate-300 focus:outline-none focus:border-cyan-500/50 shadow-inner"
+                    />
+                    <button type="submit" disabled={isCheckingDomain} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-all duration-200">
+                      {isCheckingDomain ? '...' : 'Cek'}
+                    </button>
+                  </form>
+                  {checkDomainResult && (
+                     <div className={`mt-4 p-3 rounded border ${checkDomainResult.blocked ? 'bg-rose-500/10 border-rose-500/30' : 'bg-emerald-500/10 border-emerald-500/30'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                           {checkDomainResult.blocked ? <ShieldAlert className="w-4 h-4 text-rose-500" /> : <ShieldCheck className="w-4 h-4 text-emerald-500" />}
+                           <span className={`text-xs font-bold ${checkDomainResult.blocked ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {checkDomainResult.blocked ? 'TERBLOKIR (LAMAN LABUH)' : 'BERSIH (LOLOS)'}
+                           </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono pl-6 leading-tight">
+                           <p className="truncate">IP: <span className="text-slate-300">{checkDomainResult.current_ips?.join(', ') || '-'}</span></p>
+                        </div>
                      </div>
-                   ))}
-                   {topAnalytics.blocked.length === 0 && <span className="text-slate-500 text-sm">No threats blocked...</span>}
-                 </div>
+                  )}
                </div>
 
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg overflow-hidden flex flex-col h-[300px]">
@@ -654,6 +673,51 @@ function App() {
               </div>
 
              </div>
+            </div>
+
+            {/* Row 5: Top Analytics Expanded */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-12">
+               {/* Top Blocked */}
+               <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-lg flex flex-col max-h-96">
+                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-rose-500"/> Top Access Blocked</h3>
+                 <div className="space-y-2 overflow-y-auto flex-1 custom-scrollbar pr-1">
+                   {topAnalytics.blocked?.map((d, i) => (
+                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-rose-900/30 hover:border-rose-800/50">
+                       <span className="text-rose-100 text-xs truncate pr-2 font-mono flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>{d.name}</span>
+                       <span className="text-rose-400 font-bold bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20 text-[10px]">{d.count.toLocaleString()} x</span>
+                     </div>
+                   ))}
+                   {!topAnalytics.blocked?.length && <span className="text-slate-500 text-sm">No threats blocked...</span>}
+                 </div>
+               </div>
+               
+               {/* Top Allowed */}
+               <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-lg flex flex-col max-h-96">
+                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-500"/> Top Resolusi URL</h3>
+                 <div className="space-y-2 overflow-y-auto flex-1 custom-scrollbar pr-1">
+                   {topAnalytics.allowed?.map((d, i) => (
+                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-emerald-900/30 hover:border-emerald-800/50">
+                       <span className="text-emerald-100 text-xs truncate pr-2 font-mono flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{d.name}</span>
+                       <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 text-[10px]">{d.count.toLocaleString()} x</span>
+                     </div>
+                   ))}
+                   {!topAnalytics.allowed?.length && <span className="text-slate-500 text-sm">No traffic yet...</span>}
+                 </div>
+               </div>
+
+               {/* Top Clients */}
+               <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-lg flex flex-col max-h-96">
+                 <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2"><Users className="w-4 h-4 text-cyan-500"/> Top User Aktif (IP)</h3>
+                 <div className="space-y-2 overflow-y-auto flex-1 custom-scrollbar pr-1">
+                   {topAnalytics.clients?.map((d, i) => (
+                     <div key={i} className="flex justify-between items-center px-4 py-2 bg-[#0b1120] rounded-lg border border-cyan-900/30 hover:border-cyan-800/50">
+                       <span className="text-cyan-100 text-xs truncate pr-2 font-mono flex items-center gap-3"><span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>{d.name}</span>
+                       <span className="text-cyan-400 font-bold bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/20 text-[10px]">{d.count.toLocaleString()} x</span>
+                     </div>
+                   ))}
+                   {!topAnalytics.clients?.length && <span className="text-slate-500 text-sm">No clients observed...</span>}
+                 </div>
+               </div>
             </div>
           </div>
 
@@ -960,7 +1024,7 @@ function App() {
                   )}
                 </div>
 
-                <div className="p-6 bg-slate-950/50 flex flex-col gap-4">
+                 <div className="p-6 bg-slate-950/50 flex flex-col gap-4">
                   <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-1">Pencarian Teks Database RPZ</h3>
                   <form onSubmit={handleSearchRpz} className="flex items-center gap-3">
                     <input 

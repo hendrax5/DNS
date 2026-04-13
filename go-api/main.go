@@ -301,6 +301,7 @@ func initDB() {
 	}
 
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('laman_labuh_ip', '139.255.196.196')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('tproxy_enabled', 'true')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('acl_ips', '127.0.0.0/8\n10.0.0.0/8\n192.168.0.0/16\n172.16.0.0/12')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_feeds', 'https://trustpositif.kominfo.go.id/')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('domain_forwarders', 'kominfo.go.id,8.8.8.8,1.1.1.1')`)
@@ -1480,6 +1481,7 @@ func GetDigHealth(c *fiber.Ctx) error {
 	type HealthResult struct {
 		Domain  string `json:"domain"`
 		Latency int    `json:"latency"`
+		Ping    int    `json:"ping"`
 		Status  string `json:"status"` // "OK" or "TIMEOUT"
 	}
 
@@ -1501,8 +1503,16 @@ func GetDigHealth(c *fiber.Ctx) error {
 			if err != nil || latency > 2000 {
 				status = "TIMEOUT"
 			}
+			// OS level ping
+			var pingMs int = 0
+			pingStart := time.Now()
+			cmd := exec.Command("ping", "-c", "1", "-W", "1", domain)
+			if cmd.Run() == nil {
+				pingMs = int(time.Since(pingStart).Milliseconds())
+			}
+
 			mu.Lock()
-			results = append(results, HealthResult{Domain: domain, Latency: latency, Status: status})
+			results = append(results, HealthResult{Domain: domain, Latency: latency, Ping: pingMs, Status: status})
 			mu.Unlock()
 		}(t.Domain)
 	}
@@ -1619,9 +1629,9 @@ func CheckDomainBlock(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"domain":     domain,
-		"is_blocked": isBlocked,
-		"resolve_to": result,
+		"domain":      domain,
+		"blocked":     isBlocked,
+		"current_ips": strings.Split(result, "\n"),
 	})
 }
 
