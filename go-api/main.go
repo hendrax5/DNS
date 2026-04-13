@@ -929,6 +929,30 @@ func SaveUpstreamConfig(c *fiber.Ctx) error {
 }
 
 func syncRPZWorker() {
+	var intervalStr string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_sync_interval'").Scan(&intervalStr)
+	interval := 1
+	if res, err := strconv.Atoi(intervalStr); err == nil && res > 0 {
+		interval = res
+	}
+
+	// Jangan fetch ulang setiap restart jika cache masih segar (berdasarkan ModTime)
+	if stat, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); err == nil {
+		timePassed := time.Since(stat.ModTime())
+		timeRequired := time.Duration(interval) * time.Minute
+		if timePassed < timeRequired {
+			sleepTime := timeRequired - timePassed
+			msg := fmt.Sprintf("Startup: Cache zone RPZ masih segar. Menunda antrean fetch selama %v...", sleepTime.Round(time.Second))
+			log.Println("[RPZ Worker]", msg)
+			addWorkerLog("RPZ WORKER", msg)
+			
+			select {
+			case <-time.After(sleepTime):
+			case <-forceSync:
+			}
+		}
+	}
+
 	for {
 		var value string
 		err := db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_feeds'").Scan(&value)
