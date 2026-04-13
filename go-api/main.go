@@ -549,19 +549,24 @@ func SaveACL(c *fiber.Ctx) error {
 }
 
 func GetAdvancedConfig(c *fiber.Ctx) error {
-	var safesearch, dnssec, tproxy string
+	var safesearch, dnssec, tproxy, maxqps string
 	err1 := db.QueryRow("SELECT value FROM settings WHERE key = 'safesearch_enabled'").Scan(&safesearch)
 	err2 := db.QueryRow("SELECT value FROM settings WHERE key = 'dnssec_enabled'").Scan(&dnssec)
 	err3 := db.QueryRow("SELECT value FROM settings WHERE key = 'tproxy_enabled'").Scan(&tproxy)
+	err4 := db.QueryRow("SELECT value FROM settings WHERE key = 'max_qps_per_ip'").Scan(&maxqps)
 	
 	if err1 != nil { safesearch = "false" }
 	if err2 != nil { dnssec = "false" }
 	if err3 != nil { tproxy = "false" }
+	if err4 != nil { maxqps = "0" }
+	
+	qpsInt, _ := strconv.Atoi(maxqps)
 
 	return c.JSON(fiber.Map{
 		"safesearch": safesearch == "true",
 		"dnssec": dnssec == "true",
 		"tproxy": tproxy == "true",
+		"max_qps": qpsInt,
 	})
 }
 
@@ -570,6 +575,7 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 		Safesearch bool `json:"safesearch"`
 		Dnssec     bool `json:"dnssec"`
 		Tproxy     bool `json:"tproxy"`
+		MaxQPS     int  `json:"max_qps"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
@@ -581,10 +587,18 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 	if req.Dnssec { dnssecStr = "true" }
 	tproxyStr := "false"
 	if req.Tproxy { tproxyStr = "true" }
+	
+	maxQpsStr := strconv.Itoa(req.MaxQPS)
+
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('safesearch_enabled', 'false')")
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('dnssec_enabled', 'false')")
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('tproxy_enabled', 'false')")
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_qps_per_ip', '0')")
 
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'safesearch_enabled'", safesearchStr)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'dnssec_enabled'", dnssecStr)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'max_qps_per_ip'", maxQpsStr)
 
 	// Execute TProxy IPtables
 	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
@@ -595,6 +609,27 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 	}
 
 	generateLuaConfig()
+
+	// Update DNSDist Config for Max QPS
+	b, err := ioutil.ReadFile("/etc/powerdns/dnsdist.conf")
+	if err == nil {
+		lines := strings.Split(string(b), "\n")
+		changed := false
+		for i, line := range lines {
+			if strings.Contains(line, "MaxQPSIPRule") {
+				if req.MaxQPS > 0 {
+					lines[i] = fmt.Sprintf("addAction(MaxQPSIPRule(%d), TCAction())", req.MaxQPS)
+				} else {
+					lines[i] = "-- addAction(MaxQPSIPRule(1000), DropAction())"
+				}
+				changed = true
+			}
+		}
+		if changed {
+			ioutil.WriteFile("/etc/powerdns/dnsdist.conf", []byte(strings.Join(lines, "\n")), 0644)
+			exec.Command("supervisorctl", "restart", "dnsdist").Run()
+		}
+	}
 
 	return c.JSON(fiber.Map{"message": "Advanced config updated"})
 }

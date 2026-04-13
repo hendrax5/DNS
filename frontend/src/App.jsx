@@ -101,6 +101,7 @@ function App() {
   const [safeSearch, setSafeSearch] = useState(false);
   const [dnssec, setDnssec] = useState(false);
   const [tproxy, setTproxy] = useState(true);
+  const [maxQps, setMaxQps] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -187,6 +188,7 @@ function App() {
       if(dataAdv.safesearch !== undefined) setSafeSearch(dataAdv.safesearch);
       if(dataAdv.dnssec !== undefined) setDnssec(dataAdv.dnssec);
       if(dataAdv.tproxy !== undefined) setTproxy(dataAdv.tproxy);
+      if(dataAdv.max_qps !== undefined) setMaxQps(dataAdv.max_qps);
 
       const resDig = await apiFetch('/api/dig-targets');
       const dataDig = await resDig.json();
@@ -236,7 +238,7 @@ function App() {
       await apiFetch('/api/advanced-config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({safesearch: safeSearch, dnssec, tproxy})
+        body: JSON.stringify({safesearch: safeSearch, dnssec, tproxy, max_qps: Number(maxQps)})
       });
 
       const ips = digTargetsText.split('\n').map(d=>d.trim()).filter(d=>d);
@@ -1382,6 +1384,33 @@ function App() {
                       <div>
                         <label htmlFor="dnssec" className="text-white font-semibold cursor-pointer text-base">Validasi Strict DNSSEC</label>
                         <p className="text-slate-400 text-sm mt-1 leading-relaxed">Aktifkan validasi tanda tangan kriptografi tegar (zona BOGUS akan dibuang/drop). Peringatan: Akses diblokir seketika jika sertifikat otentikasi domain kedaluwarsa.</p>
+                      </div>
+                    </div>
+
+                    {/* Max QPS Limit */}
+                    <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-800/50 bg-[#0b1120]">
+                      <div className="pt-1">
+                        <Activity className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div className="flex-1">
+                        <label htmlFor="maxQps" className="text-white font-semibold flex items-center gap-2 text-base">
+                           Batas QPS per IP Address (DDoS Protection)
+                        </label>
+                        <p className="text-slate-400 text-sm mt-1 mb-3 leading-relaxed">
+                          Batasi kueri dari satu IP (Rate Limit DNSDist) untuk mencegah flooding DDoS. Kueri di luar batas normal akan dipaksa via TCP. Set ke <code>0</code> untuk membebaskan 100% trafik tanpa batas (Benchmark mode).
+                        </p>
+                        <div className="flex items-center gap-3">
+                           <input 
+                             type="number" 
+                             id="maxQps"
+                             min="0"
+                             max="100000"
+                             value={maxQps} 
+                             onChange={(e) => setMaxQps(e.target.value)} 
+                             className="w-32 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-cyan-400 font-mono focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-inner"
+                           />
+                           <span className="text-slate-500 text-sm font-semibold">Queries Per Second</span>
+                        </div>
                       </div>
                     </div>
                     {/* Custom Dig Monitor Settings */}
