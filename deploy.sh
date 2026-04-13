@@ -55,9 +55,11 @@ fi
 echo "[3/3] Melakukan Docker Rebuild (Menerapkan Konfigurasi Terkini)..."
 cd "$DIR" || exit
 if command -v docker-compose &> /dev/null; then
-    docker-compose up -d --build netshield-dns
+    docker-compose build --no-cache netshield-dns
+    docker-compose up -d --force-recreate netshield-dns
 elif docker compose version &> /dev/null; then
-    docker compose up -d --build netshield-dns
+    docker compose build --no-cache netshield-dns
+    docker compose up -d --force-recreate netshield-dns
 else
     echo " ❌ ERROR: Command docker / docker-compose tidak ditemukan di sistem!"
 fi

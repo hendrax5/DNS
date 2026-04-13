@@ -84,6 +84,9 @@ function App() {
   const [searchRpzQuery, setSearchRpzQuery] = useState('');
   const [searchRpzResults, setSearchRpzResults] = useState([]);
   const [isSearchingRpz, setIsSearchingRpz] = useState(false);
+  const [checkDomainQuery, setCheckDomainQuery] = useState('');
+  const [checkDomainResult, setCheckDomainResult] = useState(null);
+  const [isCheckingDomain, setIsCheckingDomain] = useState(false);
   const [rpzAXFR, setRpzAXFR] = useState([]);
   const [syncInterval, setSyncInterval] = useState(1);
   const [domainForwarders, setDomainForwarders] = useState('');
@@ -183,6 +186,7 @@ function App() {
       const dataAdv = await resAdv.json();
       if(dataAdv.safesearch !== undefined) setSafeSearch(dataAdv.safesearch);
       if(dataAdv.dnssec !== undefined) setDnssec(dataAdv.dnssec);
+      if(dataAdv.tproxy !== undefined) setTproxy(dataAdv.tproxy);
 
       const resDig = await apiFetch('/api/dig-targets');
       const dataDig = await resDig.json();
@@ -232,7 +236,7 @@ function App() {
       await apiFetch('/api/advanced-config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({safesearch: safeSearch, dnssec})
+        body: JSON.stringify({safesearch: safeSearch, dnssec, tproxy})
       });
 
       const ips = digTargetsText.split('\n').map(d=>d.trim()).filter(d=>d);
@@ -285,6 +289,21 @@ function App() {
     } finally {
       setIsSearchingRpz(false);
     }
+  };
+
+  const handleCheckDomain = async (e) => {
+    e.preventDefault();
+    if (!checkDomainQuery) return;
+    setIsCheckingDomain(true);
+    setCheckDomainResult(null);
+    try {
+      const res = await apiFetch('/api/check-domain?domain=' + encodeURIComponent(checkDomainQuery));
+      const data = await res.json();
+      setCheckDomainResult(data);
+    } catch(err) {
+      showNotification('Gagal memeriksa domain', 'error');
+    }
+    setIsCheckingDomain(false);
   };
 
   const saveAXFR = async () => {
@@ -612,6 +631,26 @@ function App() {
                    {topAnalytics.blocked.length === 0 && <span className="text-slate-500 text-sm">No threats blocked...</span>}
                  </div>
                </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg overflow-hidden flex flex-col h-[300px]">
+                <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-2"><Server className="w-4 h-4 text-cyan-500" /> Worker Process Logs</span>
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {stats?.worker_logs?.length > 0 ? stats.worker_logs.map((L, i) => (
+                    <div key={i} className="p-2 rounded border border-slate-800 bg-slate-800/50 text-[10px] sm:text-xs">
+                       <div className="flex justify-between items-center text-slate-400 mb-1">
+                          <span className="font-bold text-cyan-400">[{L.worker}]</span>
+                          <span className="font-mono opacity-60">{L.time}</span>
+                       </div>
+                       <p className="text-slate-300 font-mono tracking-tight">{L.msg}</p>
+                    </div>
+                  )) : (
+                    <div className="flex justify-center items-center h-full text-slate-500 text-xs text-center px-4">Worker daemon aktif & bersiap...</div>
+                  )}
+                </div>
+              </div>
+
              </div>
             </div>
           </div>
@@ -879,12 +918,48 @@ function App() {
                       Mesin Pencarian Database RPZ
                     </h2>
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                      Lakukan diagnosa cek Domain di jutaan arsip Intelijen untuk memastikan apakah domain/TLD telah diblokir.
+                      Lakukan diagnosa Cek Domain secara LIVE untuk melihat apakah domain terblokir, difilter, atau bersih.
+                      Anda juga dapat mencari teks mentah di Database RPZ di kotak bawahnya.
                     </p>
                   </div>
                 </div>
                 
+                <div className="p-6 bg-slate-950 flex flex-col gap-4 border-b border-slate-800">
+                  <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-1">Diagnostic Cek Laman Labuh (Real-time Resolving)</h3>
+                  <form onSubmit={handleCheckDomain} className="flex items-center gap-3">
+                    <input 
+                      type="text" 
+                      value={checkDomainQuery}
+                      onChange={e => setCheckDomainQuery(e.target.value)}
+                      placeholder="misal. p0rn.com" 
+                      className="flex-1 max-w-lg bg-[#0b1120] border border-slate-700/50 rounded-lg px-4 py-2.5 text-sm font-mono text-slate-300 focus:outline-none focus:border-cyan-500/50 shadow-inner"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isCheckingDomain}
+                      className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg shadow-[0_0_15px_rgba(8,145,178,0.2)] transition-all duration-200 cursor-pointer whitespace-nowrap"
+                    >
+                      {isCheckingDomain ? 'Memeriksa...' : 'Cek Status Domain'}
+                    </button>
+                  </form>
+                  {checkDomainResult && (
+                     <div className={`mt-2 p-4 rounded-xl border ${checkDomainResult.blocked ? 'bg-rose-500/10 border-rose-500/30' : 'bg-emerald-500/10 border-emerald-500/30'}`}>
+                        <div className="flex items-center gap-3 mb-2">
+                           {checkDomainResult.blocked ? <ShieldAlert className="w-5 h-5 text-rose-500" /> : <ShieldCheck className="w-5 h-5 text-emerald-500" />}
+                           <span className={`font-bold ${checkDomainResult.blocked ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {checkDomainResult.blocked ? 'DOMAIN TERBLOKIR (LAMAN LABUH)' : 'DOMAIN BERSIH (LOLOS)'}
+                           </span>
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono pl-8 space-y-1">
+                           <p>Domain: <span className="text-slate-300">{checkDomainResult.domain}</span></p>
+                           <p>IP Saat Ini: <span className="text-slate-300">{checkDomainResult.current_ips?.join(', ') || '-'}</span></p>
+                        </div>
+                     </div>
+                  )}
+                </div>
+
                 <div className="p-6 bg-slate-950/50 flex flex-col gap-4">
+                  <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-1">Pencarian Teks Database RPZ</h3>
                   <form onSubmit={handleSearchRpz} className="flex items-center gap-3">
                     <input 
                       type="text" 

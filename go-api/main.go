@@ -117,6 +117,26 @@ type TimeSeriesPoint struct {
 	CacheRatio float64 `json:"cacheRatio"`
 }
 
+type WorkerLog struct {
+	Worker string `json:"worker"`
+	Msg    string `json:"msg"`
+	Time   string `json:"time"`
+}
+
+var (
+	workerLogs      []WorkerLog
+	workerLogsMutex sync.RWMutex
+)
+
+func addWorkerLog(worker string, msg string) {
+	workerLogsMutex.Lock()
+	defer workerLogsMutex.Unlock()
+	workerLogs = append([]WorkerLog{{Worker: worker, Msg: msg, Time: time.Now().Format("15:04:05")}}, workerLogs...)
+	if len(workerLogs) > 200 {
+		workerLogs = workerLogs[:200]
+	}
+}
+
 func main() {
 	initDB()
 	writeCustomRPZ()
@@ -175,6 +195,12 @@ func main() {
 
 	admin.Get("/rpz-axfr", GetRPZAXFRFeeds)
 	admin.Post("/rpz-axfr", SaveRPZAXFRFeeds)
+
+	admin.Get("/worker-logs", func(c *fiber.Ctx) error {
+		workerLogsMutex.RLock()
+		defer workerLogsMutex.RUnlock()
+		return c.JSON(fiber.Map{"logs": workerLogs})
+	})
 
 	admin.Get("/forwarders", GetForwarders)
 	admin.Post("/forwarders", SaveForwarders)
@@ -510,16 +536,19 @@ func SaveACL(c *fiber.Ctx) error {
 }
 
 func GetAdvancedConfig(c *fiber.Ctx) error {
-	var safesearch, dnssec string
+	var safesearch, dnssec, tproxy string
 	err1 := db.QueryRow("SELECT value FROM settings WHERE key = 'safesearch_enabled'").Scan(&safesearch)
 	err2 := db.QueryRow("SELECT value FROM settings WHERE key = 'dnssec_enabled'").Scan(&dnssec)
+	err3 := db.QueryRow("SELECT value FROM settings WHERE key = 'tproxy_enabled'").Scan(&tproxy)
 	
 	if err1 != nil { safesearch = "false" }
 	if err2 != nil { dnssec = "false" }
+	if err3 != nil { tproxy = "false" }
 
 	return c.JSON(fiber.Map{
 		"safesearch": safesearch == "true",
 		"dnssec": dnssec == "true",
+		"tproxy": tproxy == "true",
 	})
 }
 
@@ -527,6 +556,7 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 	var req struct {
 		Safesearch bool `json:"safesearch"`
 		Dnssec     bool `json:"dnssec"`
+		Tproxy     bool `json:"tproxy"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
@@ -536,9 +566,20 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 	if req.Safesearch { safesearchStr = "true" }
 	dnssecStr := "false"
 	if req.Dnssec { dnssecStr = "true" }
+	tproxyStr := "false"
+	if req.Tproxy { tproxyStr = "true" }
 
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'safesearch_enabled'", safesearchStr)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'dnssec_enabled'", dnssecStr)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
+
+	// Execute TProxy IPtables
+	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+	if req.Tproxy {
+		exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+		exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
+	}
 
 	generateLuaConfig()
 
@@ -643,6 +684,11 @@ func GetPDNSStats(c *fiber.Ctx) error {
 	copy(alrts, telemetryAlerts)
 	metricsMutex.RUnlock()
 
+	workerLogsMutex.RLock()
+	wLogs := make([]WorkerLog, len(workerLogs))
+	copy(wLogs, workerLogs)
+	workerLogsMutex.RUnlock()
+
 	return c.JSON(fiber.Map{
 		"qps":             math.Round(qps),
 		"cache_hit_ratio": math.Round(hitRatio*10) / 10,
@@ -654,6 +700,7 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		"history_series":  hist,
 		"query_types":     qMap,
 		"telemetry_alerts": alrts,
+		"worker_logs":      wLogs,
 		"response_codes": map[string]float64{
 			"NOERROR": noerr,
 			"NXDOMAIN": nx,
@@ -1027,23 +1074,20 @@ func syncRPZWorker() {
 			feedMutex.Lock()
 			feedStatuses = newStatuses
 			feedMutex.Unlock()
-
-			// PERFORM AGGRESSIVE PRUNING HEURISTICS
+			// DIRECT MAPPING WITHOUT HEURISTICS
 			finalDomains := make(map[string]struct{})
 			for d := range domainMap {
-				base := getBaseDomain(d)
-				if rootCounts[base] > 3 && !protectedRoots[base] {
-					if !wlMap["*."+base] { finalDomains["*."+base] = struct{}{} }
-					if !wlMap[base] { finalDomains[base] = struct{}{} }
-				} else {
-					if !wlMap[d] { finalDomains[d] = struct{}{} }
+				if !wlMap[d] { 
+					finalDomains[d] = struct{}{} 
 				}
 			}
 
 			for d := range finalDomains {
 				compiledLines = append(compiledLines, fmt.Sprintf("%s %s", d, blockAction))
 			}
-			log.Printf("[RPZ Worker] Heuristic Deduction Complete: %d original records pruned to %d output rules.", len(domainMap), len(finalDomains))
+			msg := fmt.Sprintf("[RPZ Worker] Parsing Selesai: %d original records menghasilkan %d rules blokir akurat.", len(domainMap), len(finalDomains))
+			log.Println(msg)
+			addWorkerLog("RPZ WORKER", msg)
 
 			// Write Whitelist explicit rules at bottom to guarantee parsing validity
 			for d := range wlMap {
@@ -1527,15 +1571,26 @@ func addTelemetryAlert(msg, level string) {
 }
 
 func liveQPSWorker() {
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	var lastCount float64
 	for range ticker.C {
-		out, err := exec.Command("rec_control", "get", "questions").Output()
+		out, err := exec.Command("dnsdist", "-c", "-k", "SuperSecretKey", "-e", "dumpStats()").Output()
 		if err == nil {
-			val, _ := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
+			lines := strings.Split(string(out), "\n")
+			var queries float64
+			for _, l := range lines {
+				if strings.HasPrefix(l, "queries ") {
+					f := strings.Fields(l)
+					if len(f) >= 2 {
+						queries, _ = strconv.ParseFloat(f[1], 64)
+					}
+					break
+				}
+			}
+
 			if lastCount > 0 {
 				metricsMutex.Lock()
-				liveQPS = (val - lastCount) / 3.0
+				liveQPS = (queries - lastCount) / 2.0
 				if liveQPS < 0 { liveQPS = 0 }
 				metricsMutex.Unlock()
 			} else {
@@ -1543,7 +1598,7 @@ func liveQPSWorker() {
 				liveQPS = 0
 				metricsMutex.Unlock()
 			}
-			lastCount = val
+			lastCount = queries
 		}
 	}
 }
