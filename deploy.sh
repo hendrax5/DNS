@@ -69,13 +69,15 @@ do_upgrade() {
 }
 
 do_docker_rebuild() {
-    echo "[Docker] Melakukan Rebuild (Menerapkan Konfigurasi Terkini)..."
+    echo "[Docker] Melakukan Rebuild Image DNS dengan Mode Jaringan Host (Mencegah Error DNS)..."
     cd "$DIR" || exit
+    
+    # Bangun image secara manual dengan network host untuk menghindari gagal resolusi apt/go mod
+    docker build --network=host -t netshield-dns-image --no-cache .
+    
     if command -v docker-compose &> /dev/null; then
-        docker-compose build --no-cache netshield-dns
         docker-compose up -d --force-recreate netshield-dns
     elif docker compose version &> /dev/null; then
-        docker compose build --no-cache netshield-dns
         docker compose up -d --force-recreate netshield-dns
     else
         echo " ❌ ERROR: Command docker / docker-compose tidak ditemukan di sistem!"

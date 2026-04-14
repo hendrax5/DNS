@@ -2,9 +2,7 @@ version: '3.3'
 
 services:
   netshield-dns:
-    build:
-      context: .
-      network: host
+    image: netshield-dns-image
     container_name: netshield-v2
     restart: always
     # Host Networking: eliminasi Docker NAT overhead
