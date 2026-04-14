@@ -363,7 +363,7 @@ func generateACLConfig() {
 	}
 	exec.Command("rec_control", "reload-lua-script").Run()
 	exec.Command("rec_control", "wipe-cache", "$").Run()
-	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "SuperSecretKey", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
+	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 }
 
 func generateForwardersConfig() {
@@ -487,7 +487,7 @@ yandex.com CNAME yandex.com.
 	// Hot reload PowerDNS settings without rebooting the container
 	exec.Command("rec_control", "reload-lua-config").Run()
 	exec.Command("rec_control", "wipe-cache", "$").Run()
-	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "SuperSecretKey", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
+	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 }
 
 func LoginHandler(c *fiber.Ctx) error {
@@ -1196,7 +1196,7 @@ func syncRPZWorker() {
 				// Signal PowerDNS to instantly reload latest compiled policies
 				exec.Command("rec_control", "reload-lua-config").Run()
 				exec.Command("rec_control", "wipe-cache", "$").Run()
-				exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "SuperSecretKey", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
+				exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 
 				// Sinkronisasi ke XDP BPF Map (jika XDP aktif)
 				// Domain terblokir akan di-DROP di level NIC!
@@ -1689,7 +1689,7 @@ func liveQPSWorker() {
 	ticker := time.NewTicker(2 * time.Second)
 	var lastCount float64
 	for range ticker.C {
-		out, err := exec.Command("dnsdist", "-c", "-k", "SuperSecretKey", "-e", "dumpStats()").Output()
+		out, err := exec.Command("dnsdist", "-c", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "dumpStats()").Output()
 		if err == nil {
 			lines := strings.Split(string(out), "\n")
 			var queries float64
