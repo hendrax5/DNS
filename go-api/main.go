@@ -363,6 +363,7 @@ func generateACLConfig() {
 	}
 	exec.Command("rec_control", "reload-lua-script").Run()
 	exec.Command("rec_control", "wipe-cache", "$").Run()
+	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "SuperSecretKey", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 }
 
 func generateForwardersConfig() {
@@ -486,6 +487,7 @@ yandex.com CNAME yandex.com.
 	// Hot reload PowerDNS settings without rebooting the container
 	exec.Command("rec_control", "reload-lua-config").Run()
 	exec.Command("rec_control", "wipe-cache", "$").Run()
+	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "SuperSecretKey", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 }
 
 func LoginHandler(c *fiber.Ctx) error {
@@ -1194,6 +1196,7 @@ func syncRPZWorker() {
 				// Signal PowerDNS to instantly reload latest compiled policies
 				exec.Command("rec_control", "reload-lua-config").Run()
 				exec.Command("rec_control", "wipe-cache", "$").Run()
+				exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "SuperSecretKey", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 
 				// Sinkronisasi ke XDP BPF Map (jika XDP aktif)
 				// Domain terblokir akan di-DROP di level NIC!
