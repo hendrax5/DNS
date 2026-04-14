@@ -84,12 +84,20 @@ do_docker_rebuild() {
         exit 1
     fi
     
-    if command -v docker-compose &> /dev/null; then
-        docker-compose up -d --force-recreate netshield-dns
-    elif docker compose version &> /dev/null; then
-        docker compose up -d --force-recreate netshield-dns
-    else
-        echo " ❌ ERROR: Command docker / docker-compose tidak ditemukan di sistem!"
+    echo "[Docker] Meluncurkan DNS Engine (Native Docker Run menghemat limit dependencies)..."
+    docker rm -f netshield-v2 2>/dev/null || true
+    
+    if ! docker run -d \
+        --name netshield-v2 \
+        --restart always \
+        --network host \
+        --privileged \
+        --tmpfs /var/log/netshield \
+        --ulimit nofile=1048576:1048576 \
+        -v "$DIR/data:/data" \
+        -v /sys/fs/bpf:/sys/fs/bpf \
+        netshield-dns-image; then
+        echo " ❌ FATAL ERROR: Gagal menjalankan kontainer netshield-v2!"
         exit 1
     fi
 }
