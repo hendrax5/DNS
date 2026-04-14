@@ -69,11 +69,20 @@ do_upgrade() {
 }
 
 do_docker_rebuild() {
+    echo "🧹 Membersihkan aturan NAT/TProxy sementara agar kontainer Docker bisa mengakses internet / DNS eksternal..."
+    iptables -t nat -D PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
+    iptables -t nat -D PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
+    iptables -t nat -D OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
+    iptables -t nat -D OUTPUT -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
+
     echo "[Docker] Melakukan Rebuild Image DNS dengan Mode Jaringan Host (Mencegah Error DNS)..."
     cd "$DIR" || exit
     
     # Bangun image secara manual dengan network host untuk menghindari gagal resolusi apt/go mod
-    docker build --network=host -t netshield-dns-image --no-cache .
+    if ! docker build --network=host -t netshield-dns-image --no-cache . ; then
+        echo " ❌ FATAL ERROR: Gagal mem-build image Docker! (Cek log di atas)"
+        exit 1
+    fi
     
     if command -v docker-compose &> /dev/null; then
         docker-compose up -d --force-recreate netshield-dns
@@ -81,6 +90,7 @@ do_docker_rebuild() {
         docker compose up -d --force-recreate netshield-dns
     else
         echo " ❌ ERROR: Command docker / docker-compose tidak ditemukan di sistem!"
+        exit 1
     fi
 }
 
