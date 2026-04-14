@@ -133,4 +133,26 @@ netshield/
 
 ---
 
+## 💡 Panduan Troubleshooting
+
+Jika Anda menemui kendala dalam penerapan di lapangan, silakan periksa hal-hal berikut:
+
+### 1. RPZ / Pemblokir Aktif Namun Trafik *Membobol* (Tidak Terblokir)
+- **Cek Jeda Waktu Sinkronisasi & *Cache* DNSDist**: 
+  Setelah kontainer dinyalakan atau ditekan tombol *Sync*, sistem membutuhkan jeda ±15-20 detik untuk mengunduh dan menelan 1-7 Juta baris RPZ ke dalam memori. Jika Anda melakukan *query* di sela waktu tersebut, domain kotor akan lolos dan sayangnya akan **diingat oleh *PacketCache* DNSDist**. 
+  - *Solusi:* Tunggu 20 detik pasca-deploy, dan jika Anda telanjur mengetes, silakan *flush dns* OS Anda.
+- **Cek Status Domain Asli Kominfo**: 
+  Seringkali pengguna mengetes `x.com` atau domain lama pembajakan yang ternyata **sudah dianggap legal dan dicabut** dari *blacklist* TrustPositif Kominfo. 
+  - *Cara Validasi:* Jalankan `curl -s https://trustpositif.komdigi.go.id/assets/db/domains_isp | grep -E '^domainanda\.com$'`. Jika kosong, berarti situs tersebut memang tak diblokir. Gunakan domain pasti seperti `reddit.com` atau `vimeo.com` untuk uji coba lapangan.
+
+### 2. TProxy Aktif Namun *Docker Build* Gagal (*Connection Refused*)
+Jika Anda mengaktifkan TProxy (Transparent DNS) lewat `iptables -j REDIRECT`, semua laju kelonggaran *port 53* OS (*host*) akan langsung dibegal paksa ke dalam pelabuhan NetShield. Jika pada titik ini Anda melakukan `docker build`, wadah Docker tak akan mandapatkan akses resolusi DNS internasional dan *compiler* terhenti.
+- *Solusi:* Skrip `deploy.sh` saat ini telah menyertakan pembilasan sirkuit NAT otomatis sebelum `build` dan dikerjakan melalui asuhan perantara `docker run` asli (*native*) merobohkan masalah fatal di OS Ubuntu modern. Selalu pastikan Anda menjalankan skrip rilis terbaru.
+
+### 3. "KeyError: ContainerConfig" saat instalasi dengan docker-compose
+- *Penyebab:* Cacat internal pada pustaka *Python docker-compose* versi lawas jika dihadapkan pada Docker Daemon Engine keluaran terbaru.
+- *Solusi:* NetShield V5.0 telah membebaskan diri dari kukungan rantai *docker-compose* dan kini ditenagai secara absolut dan murni memanfaatkan `docker run` lewat *Deployer bash otomatis* yang terbukti tangguh segala platform.
+
+---
+
 *Dibangun dengan presisi untuk kecepatan dan keamanan absolut.* 🦅
