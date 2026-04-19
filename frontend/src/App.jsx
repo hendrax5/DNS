@@ -21,7 +21,8 @@ import {
   Plus,
   Trash2,
   ShieldBan,
-  Users
+  Users,
+  Edit
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import Zones from './pages/Zones';
@@ -106,6 +107,7 @@ function App() {
 
   // BGP Config
   const [bgpStatus, setBgpStatus] = useState([]);
+  const [editingPeerIndex, setEditingPeerIndex] = useState(null);
   const [bgpConfig, setBgpConfig] = useState({
     enabled: false, local_asn: 65000, router_id: '127.0.0.1', peers: []
   });
@@ -1573,72 +1575,128 @@ function App() {
                         <div className="border-t border-slate-800/50 pt-5">
                           <div className="flex justify-between items-center mb-4">
                             <h3 className="text-white font-bold flex items-center gap-2"><Server className="w-5 h-5 text-indigo-400"/> Network Peers List</h3>
-                            <button onClick={() => setBgpConfig({...bgpConfig, peers: [...(bgpConfig.peers||[]), {id: Date.now().toString(), name:'New Peer', ip:'', asn: 65000, type:'ibgp', multihop:0, md5:'', enabled:true}]})} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-sm font-medium flex items-center gap-1 shadow-lg transition-colors"><Plus className="w-4 h-4"/> Tambah Peer</button>
+                            <button onClick={() => {
+                                const newPeerIndex = (bgpConfig.peers||[]).length;
+                                setBgpConfig({...bgpConfig, peers: [...(bgpConfig.peers||[]), {id: Date.now().toString(), name:'New Peer', ip:'', asn: 65000, type:'ibgp', multihop:0, md5:'', enabled:true}]});
+                                setEditingPeerIndex(newPeerIndex);
+                            }} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-sm font-medium flex items-center gap-1 shadow-lg transition-colors"><Plus className="w-4 h-4"/> Tambah Peer</button>
                           </div>
                           
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                            {(bgpConfig.peers || []).map((peer, idx) => {
-                              const liveStat = bgpStatus.find(s => s.conf?.neighbor_address === peer.ip);
-                              const isEstablished = liveStat?.state?.session_state === 6;
-                              return (
-                                <div key={peer.id} className="bg-slate-900 border border-slate-700/60 rounded-xl overflow-hidden relative">
-                                  <div className="h-1.5 w-full bg-slate-800 relative">
-                                    <div className={`absolute top-0 left-0 h-full ${isEstablished ? 'bg-emerald-500' : 'bg-rose-500'} transition-all`} style={{width: isEstablished?'100%':'20%'}}></div>
-                                  </div>
-                                  <div className="p-4">
-                                    <div className="flex justify-between mb-3">
-                                      <div className="flex items-center gap-2">
-                                        <select value={peer.type} onChange={e => {
-                                            const v = e.target.value;
-                                            const np = [...bgpConfig.peers]; np[idx].type = v;
-                                            if(v === 'ibgp') np[idx].asn = bgpConfig.local_asn;
-                                            setBgpConfig({...bgpConfig, peers: np});
-                                        }} className="bg-slate-800 text-xs text-white px-2 py-1 rounded font-mono font-bold outline-none border border-slate-600">
-                                          <option value="ibgp">iBGP</option>
-                                          <option value="ebgp">eBGP</option>
-                                        </select>
-                                        <input type="text" value={peer.name} onChange={e => {const np = [...bgpConfig.peers]; np[idx].name = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="bg-transparent text-white font-bold max-w-[120px] outline-none border-b border-transparent focus:border-indigo-500 text-sm" placeholder="Peer Name" />
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${isEstablished ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : liveStat ? 'border-amber-500/50 text-amber-400 bg-amber-500/10' : 'border-slate-600 text-slate-400 bg-slate-800/50'}`}>
-                                          {isEstablished ? `UP (Prefix: ${liveStat.state?.adj_table?.accepted || 0})` : liveStat ? 'CONNECTING/IDLE' : 'PENDING'}
-                                        </div>
-                                        <button onClick={() => {const np = [...bgpConfig.peers]; np.splice(idx,1); setBgpConfig({...bgpConfig, peers: np})}} className="text-slate-400 hover:text-rose-400"><Trash2 className="w-4 h-4"/></button>
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 mb-3">
-                                      <div>
-                                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">IP Address</label>
-                                        <input type="text" value={peer.ip} onChange={e => {const np = [...bgpConfig.peers]; np[idx].ip = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="10.0.0.1" />
-                                      </div>
-                                      <div>
-                                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Remote ASN</label>
-                                        <input type="number" readOnly={peer.type === 'ibgp'} value={peer.asn} onChange={e => {const np = [...bgpConfig.peers]; np[idx].asn = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className={`w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs font-mono outline-none text-slate-300 ${peer.type === 'ibgp'?'opacity-50':''}`} />
-                                      </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div>
-                                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">MD5 Secret</label>
-                                        <input type="password" value={peer.md5} onChange={e => {const np = [...bgpConfig.peers]; np[idx].md5 = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="Optional" />
-                                      </div>
-                                      {peer.type === 'ebgp' && (
-                                        <div>
-                                          <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">EBGP Multihop</label>
-                                          <input type="number" value={peer.multihop} onChange={e => {const np = [...bgpConfig.peers]; np[idx].multihop = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="0 (Disabled)" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            {(bgpConfig.peers?.length || 0) === 0 && (
-                                <div className="col-span-full border-2 border-dashed border-slate-800 rounded-xl p-8 flex flex-col items-center text-center">
-                                  <Server className="w-12 h-12 text-slate-600 mb-3" />
-                                  <h3 className="text-slate-300 font-bold mb-1">Belum Ada Router Peer</h3>
-                                  <p className="text-slate-500 text-sm">Tambahkan perangkat eBGP (Komdigi) atau iBGP (Edge Router lokal) untuk mendistribusikan Blackhole ke Laman Labuh.</p>
-                                </div>
-                            )}
+                          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                            <table className="w-full text-left text-sm text-slate-400">
+                              <thead className="bg-[#0b1120] text-slate-300 text-xs uppercase font-semibold">
+                                <tr>
+                                  <th className="px-4 py-3">Status</th>
+                                  <th className="px-4 py-3">Deskripsi (Tipe)</th>
+                                  <th className="px-4 py-3">Remote Peer (IP)</th>
+                                  <th className="px-4 py-3">Remote ASN</th>
+                                  <th className="px-4 py-3">Prefix</th>
+                                  <th className="px-4 py-3 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(bgpConfig.peers || []).length === 0 ? (
+                                  <tr>
+                                    <td colSpan="6" className="p-8 text-center">
+                                      <Server className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                                      <p className="text-slate-300 font-bold mb-1">Belum Ada Router Peer</p>
+                                      <p className="text-slate-500 text-xs">Tambahkan perangkat eBGP (Komdigi) atau iBGP (Edge Router lokal).</p>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  (bgpConfig.peers || []).map((peer, idx) => {
+                                    const liveStat = bgpStatus.find(s => s.conf?.neighbor_address === peer.ip);
+                                    const isEstablished = liveStat?.state?.session_state === 6;
+                                    const prefixCount = liveStat?.state?.adj_table?.accepted || 0;
+                                    const isEditing = editingPeerIndex === idx;
+
+                                    if (isEditing) {
+                                      return (
+                                        <tr key={`edit-${peer.id || idx}`} className="bg-slate-800/40 border-b border-slate-800">
+                                          <td colSpan="6" className="p-4 relative">
+                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
+                                            <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold mb-3 uppercase tracking-wider"><Edit className="w-3.5 h-3.5" /> Edit Konfigurasi Peer</div>
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-900/60 p-4 rounded-lg border border-slate-700/50">
+                                              <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Deskripsi Nama</label>
+                                                <input type="text" value={peer.name} onChange={e => {const np = [...bgpConfig.peers]; np[idx].name = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-medium outline-none" placeholder="Contoh: NetShield Edge" />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Tipe BGP</label>
+                                                <select value={peer.type} onChange={e => {
+                                                    const v = e.target.value;
+                                                    const np = [...bgpConfig.peers]; np[idx].type = v;
+                                                    if(v === 'ibgp') np[idx].asn = bgpConfig.local_asn;
+                                                    setBgpConfig({...bgpConfig, peers: np});
+                                                }} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-medium outline-none">
+                                                  <option value="ibgp">iBGP (Internal)</option>
+                                                  <option value="ebgp">eBGP (External)</option>
+                                                </select>
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">IP Address</label>
+                                                <input type="text" value={peer.ip} onChange={e => {const np = [...bgpConfig.peers]; np[idx].ip = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="10.0.0.1" />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Remote ASN</label>
+                                                <input type="number" readOnly={peer.type === 'ibgp'} value={peer.asn} onChange={e => {const np = [...bgpConfig.peers]; np[idx].asn = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className={`w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs font-mono outline-none text-slate-300 ${peer.type === 'ibgp'?'opacity-30 cursor-not-allowed':''}`} />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">MD5 Secret</label>
+                                                <input type="password" value={peer.md5} onChange={e => {const np = [...bgpConfig.peers]; np[idx].md5 = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="Opsional" />
+                                              </div>
+                                              {peer.type === 'ebgp' && (
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">EBGP Multihop Limit</label>
+                                                  <input type="number" value={peer.multihop} onChange={e => {const np = [...bgpConfig.peers]; np[idx].multihop = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="0 = Disable" />
+                                                </div>
+                                              )}
+                                              <div className="col-span-full pt-3 flex justify-end gap-3 mt-2 border-t border-slate-800">
+                                                <button onClick={() => setEditingPeerIndex(null)} className="px-5 py-2 text-xs bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded font-bold transition-all shadow-lg flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Selesai Konfigurasi</button>
+                                              </div>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    }
+
+                                    return (
+                                      <tr key={peer.id || idx} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+                                        <td className="px-4 py-3">
+                                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border focus:outline-none shadow-sm ${isEstablished ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : liveStat ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isEstablished ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : liveStat ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`}></span>
+                                            {isEstablished ? 'Up' : liveStat ? 'Connecting' : 'Pending'}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="font-semibold text-slate-200 text-sm">{peer.name || 'Unnamed Peer'}</div>
+                                          <div className="text-[9px] uppercase tracking-widest mt-1 bg-slate-800/80 inline-block px-1.5 py-0.5 rounded text-slate-400 font-bold border border-slate-700/50">{peer.type}</div>
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-indigo-300 text-xs">{peer.ip || '0.0.0.0'}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-slate-300">AS{peer.asn}</td>
+                                        <td className="px-4 py-3">
+                                          <span className={`font-mono text-xs px-2 py-0.5 rounded ${isEstablished ? 'text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20' : 'text-slate-500 bg-slate-800/50'}`}>{prefixCount}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                          <div className="flex items-center justify-end gap-3">
+                                            <button onClick={() => setEditingPeerIndex(idx)} className="text-slate-400 hover:text-indigo-400 transition-transform hover:scale-110 tooltip" title="Edit Peer">
+                                              <Edit className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => {
+                                                const np = [...bgpConfig.peers]; np.splice(idx,1); setBgpConfig({...bgpConfig, peers: np});
+                                                if (editingPeerIndex === idx) setEditingPeerIndex(null);
+                                                else if (editingPeerIndex !== null && editingPeerIndex > idx) setEditingPeerIndex(editingPeerIndex - 1);
+                                            }} className="text-slate-400 hover:text-rose-400 transition-transform hover:scale-110 tooltip" title="Hapus Peer">
+                                              <Trash2 className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       </div>
