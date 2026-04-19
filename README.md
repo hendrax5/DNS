@@ -49,6 +49,7 @@ NetShield DNS adalah platform resolusi dan penyaringan DNS berskala operator tel
 
 ### 🔒 Keamanan & Penyaringan
 - **17 Juta Domain** Trust-Positif Komdigi (RPZ Engine C++)
+- **GoBGP Route Reflector (RTBH)** — Dukungan *Dynamic Multi-Peers*, eBGP *Multihop*, Injeksi MD5, dan pembelokan logis *Next-Hop-Self* iBGP ke Server Laman Labuh tanpa _Null Route_.
 - **Custom Blacklist/Whitelist** dengan Hot-Reload tanpa restart
 - **Anti-DDoS RRL**: Throttle 1000 QPS/IP, blokir query ANY
 - **SafeSearch** enforcement untuk Google, Bing, DuckDuckGo
@@ -152,6 +153,12 @@ Jika Anda mengaktifkan TProxy (Transparent DNS) lewat `iptables -j REDIRECT`, se
 ### 3. "KeyError: ContainerConfig" saat instalasi dengan docker-compose
 - *Penyebab:* Cacat internal pada pustaka *Python docker-compose* versi lawas jika dihadapkan pada Docker Daemon Engine keluaran terbaru.
 - *Solusi:* NetShield V5.0 telah membebaskan diri dari kukungan rantai *docker-compose* dan kini ditenagai secara absolut dan murni memanfaatkan `docker run` lewat *Deployer bash otomatis* yang terbukti tangguh segala platform.
+
+### 4. Sesi BGP Mentok di State `Idle`/`Connecting` (Lencana Kuning di Panel)
+Jika warna Lencana indikator *Peer* pada kontrol sentral Anda tak kunjung memancarkan warna hijau `Up` berjam-jam:
+- **Pengecekan Pertama (Multihop Parameter):** Cek jarak *hop* *router* asal Komdigi. Jika statusnya adalah tipe *eBGP* dan melewati lebih dari satu sekat interkoneksi, parameter **EBGP Multihop Limit** mutlak hukumnya **wajib diisi dengan nilai > 0** (misal 2 atau 4) dari Dasbor, tanpa itu ia tak akan diperkenankan menyentuh *Neighbor*.
+- **Pengecekan Kedua (L4 Stateful Firewall):** Verifikasi bahwa mesin *NetShield* secara mandiri mengizinkan pendaratan atau terbangnya trafik paket `TCP Port 179`. Jangan sampai ia terjebak pada rantai *Drop* bawaan sistem seperti UFW pada host.
+- **Pengecekan Ketiga (MD5 Authentication Key):** Tanyakan kembail perihal mandat kunci sekuritas *(MD5 Secret)* ke tim pusat. Banyak insiden otentikasi luruh meradang semata disebabkan **typo minor** spasi ekstra (*trailing space*) pada enkripsi MD5.
 
 ---
 
