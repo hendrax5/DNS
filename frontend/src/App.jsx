@@ -110,7 +110,6 @@ function App() {
     komdigi_ip: '', komdigi_asn: 132644, komdigi_md5: '', 
     mikrotik_ip: '', mikrotik_asn: 65000
   });
-  const [maxQps, setMaxQps] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
