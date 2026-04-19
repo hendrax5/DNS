@@ -59,15 +59,22 @@ type RPZRequest struct {
 	SyncInterval int       `json:"sync_interval"`
 }
 
+type BGPPeer struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	IP       string `json:"ip"`
+	ASN      int    `json:"asn"`
+	Multihop int    `json:"multihop"`
+	MD5      string `json:"md5"`
+	Enabled  bool   `json:"enabled"`
+}
+
 type BGPConfig struct {
-	Enabled     bool   `json:"enabled"`
-	LocalASN    int    `json:"local_asn"`
-	RouterID    string `json:"router_id"`
-	KomdigiIP   string `json:"komdigi_ip"`
-	KomdigiASN  int    `json:"komdigi_asn"`
-	KomdigiMD5  string `json:"komdigi_md5"`
-	MikrotikIP  string `json:"mikrotik_ip"`
-	MikrotikASN int    `json:"mikrotik_asn"`
+	Enabled  bool       `json:"enabled"`
+	LocalASN int        `json:"local_asn"`
+	RouterID string     `json:"router_id"`
+	Peers    []BGPPeer  `json:"peers"`
 }
 
 
@@ -266,6 +273,7 @@ func main() {
 
 	admin.Get("/bgp-config", GetBGPConfig)
 	admin.Post("/bgp-config", SaveBGPConfig)
+	admin.Get("/bgp-status", GetBGPStatus)
 
 	admin.Get("/upstream", GetUpstreamConfig)
 	admin.Post("/upstream", SaveUpstreamConfig)
@@ -368,11 +376,7 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_enabled', 'false')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_local_asn', '65000')`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_router_id', '127.0.0.1')`)
-	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_komdigi_ip', '')`)
-	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_komdigi_asn', '132644')`)
-	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_komdigi_md5', '')`)
-	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_mikrotik_ip', '')`)
-	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_mikrotik_asn', '65000')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_peers', '[]')`)
 
 	// ALWAYS securely regenerate PowerDNS Lua mappings on Startup!
 	log.Println("Regenerating PowerDNS config files based on DB State...")
@@ -828,23 +832,33 @@ func GetRPZFeeds(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"feeds": feeds, "sync_interval": interval})
 }
 
+func GetBGPStatus(c *fiber.Ctx) error {
+	out, err := exec.Command("timeout", "3", "gobgp", "neighbor", "-j").Output()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to connect to GoBGP daemon or daemon is stopped"})
+	}
+	var data interface{}
+	if err := json.Unmarshal(out, &data); err != nil {
+		return c.JSON([]interface{}{})
+	}
+	return c.JSON(data)
+}
+
 func GetBGPConfig(c *fiber.Ctx) error {
 	var cfg BGPConfig
-	var enabledStr string
-	var lAsn, kAsn, mAsn string
+	var enabledStr, lAsn, peersStr string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_enabled'").Scan(&enabledStr)
 	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_local_asn'").Scan(&lAsn)
 	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_router_id'").Scan(&cfg.RouterID)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_komdigi_ip'").Scan(&cfg.KomdigiIP)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_komdigi_asn'").Scan(&kAsn)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_komdigi_md5'").Scan(&cfg.KomdigiMD5)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_mikrotik_ip'").Scan(&cfg.MikrotikIP)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_mikrotik_asn'").Scan(&mAsn)
+	err := db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_peers'").Scan(&peersStr)
+	if err != nil || peersStr == "" {
+		peersStr = "[]"
+	}
 
 	cfg.Enabled = enabledStr == "true"
 	cfg.LocalASN, _ = strconv.Atoi(lAsn)
-	cfg.KomdigiASN, _ = strconv.Atoi(kAsn)
-	cfg.MikrotikASN, _ = strconv.Atoi(mAsn)
+	json.Unmarshal([]byte(peersStr), &cfg.Peers)
+	if cfg.Peers == nil { cfg.Peers = []BGPPeer{} }
 
 	return c.JSON(cfg)
 }
@@ -857,15 +871,13 @@ func SaveBGPConfig(c *fiber.Ctx) error {
 
 	enabledStr := "false"
 	if req.Enabled { enabledStr = "true" }
+	peersBytes, _ := json.Marshal(req.Peers)
 
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_enabled'", enabledStr)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_local_asn'", strconv.Itoa(req.LocalASN))
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_router_id'", req.RouterID)
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_komdigi_ip'", req.KomdigiIP)
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_komdigi_asn'", strconv.Itoa(req.KomdigiASN))
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_komdigi_md5'", req.KomdigiMD5)
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_mikrotik_ip'", req.MikrotikIP)
-	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_mikrotik_asn'", strconv.Itoa(req.MikrotikASN))
+	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('bgp_peers', '[]')")
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'bgp_peers'", string(peersBytes))
 
 	generateGoBGPConfig()
 
@@ -873,7 +885,7 @@ func SaveBGPConfig(c *fiber.Ctx) error {
 }
 
 func generateGoBGPConfig() {
-	var enabled, _localASN, routerID, kIP, _kASN, kMD5, mIP, _mASN string
+	var enabled, _localASN, routerID, peersStr string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_enabled'").Scan(&enabled)
 	if enabled != "true" {
 		ioutil.WriteFile("/etc/gobgpd.toml", []byte(""), 0644)
@@ -882,11 +894,11 @@ func generateGoBGPConfig() {
 	}
 	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_local_asn'").Scan(&_localASN)
 	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_router_id'").Scan(&routerID)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_komdigi_ip'").Scan(&kIP)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_komdigi_asn'").Scan(&_kASN)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_komdigi_md5'").Scan(&kMD5)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_mikrotik_ip'").Scan(&mIP)
-	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_mikrotik_asn'").Scan(&_mASN)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'bgp_peers'").Scan(&peersStr)
+
+	var peers []BGPPeer
+	if peersStr == "" { peersStr = "[]" }
+	json.Unmarshal([]byte(peersStr), &peers)
 
 	var sb strings.Builder
 	sb.WriteString("[global.config]\n")
@@ -900,26 +912,30 @@ func generateGoBGPConfig() {
 	sb.WriteString("    [policy-definitions.statements.actions.bgp-actions]\n")
 	sb.WriteString(fmt.Sprintf("      set-next-hop = \"%s\"\n\n", routerID))
 
-	// Komdigi Peering eBGP
-	if kIP != "" {
-		sb.WriteString("[[neighbors]]\n")
-		sb.WriteString("[neighbors.config]\n")
-		sb.WriteString(fmt.Sprintf("  neighbor-address = \"%s\"\n", kIP))
-		sb.WriteString(fmt.Sprintf("  peer-as = %s\n", _kASN))
-		if kMD5 != "" {
-			sb.WriteString(fmt.Sprintf("  auth-password = \"%s\"\n", kMD5))
-		}
-	}
+	localAsnInt, _ := strconv.Atoi(_localASN)
 
-	// Mikrotik/Edge ISP Peering iBGP
-	if mIP != "" {
-		sb.WriteString("\n[[neighbors]]\n")
-		sb.WriteString("[neighbors.config]\n")
-		sb.WriteString(fmt.Sprintf("  neighbor-address = \"%s\"\n", mIP))
-		sb.WriteString(fmt.Sprintf("  peer-as = %s\n", _mASN))
-		sb.WriteString("[neighbors.apply-policy.config]\n")
-		sb.WriteString("  export-policy-list = [\"next-hop-self\"]\n")
-		sb.WriteString("  default-export-policy = \"accept-route\"\n")
+	for _, p := range peers {
+		if !p.Enabled || p.IP == "" { continue }
+		sb.WriteString("[[neighbors]]\n")
+		sb.WriteString("  [neighbors.config]\n")
+		sb.WriteString(fmt.Sprintf("    neighbor-address = \"%s\"\n", p.IP))
+		sb.WriteString(fmt.Sprintf("    peer-as = %d\n", p.ASN))
+		if p.MD5 != "" {
+			sb.WriteString(fmt.Sprintf("    auth-password = \"%s\"\n", p.MD5))
+		}
+
+		if p.Type == "ebgp" && p.Multihop > 0 {
+			sb.WriteString("  [neighbors.ebgp-multihop.config]\n")
+			sb.WriteString("    enabled = true\n")
+			sb.WriteString(fmt.Sprintf("    multihop-ttl = %d\n", p.Multihop))
+		}
+
+		if p.Type == "ibgp" || p.ASN == localAsnInt {
+			sb.WriteString("  [neighbors.apply-policy.config]\n")
+			sb.WriteString("    export-policy-list = [\"next-hop-self\"]\n")
+			sb.WriteString("    default-export-policy = \"accept-route\"\n")
+		}
+		sb.WriteString("\n")
 	}
 
 	ioutil.WriteFile("/etc/gobgpd.toml", []byte(sb.String()), 0644)

@@ -105,10 +105,9 @@ function App() {
   const [maxQps, setMaxQps] = useState(0);
 
   // BGP Config
+  const [bgpStatus, setBgpStatus] = useState([]);
   const [bgpConfig, setBgpConfig] = useState({
-    enabled: false, local_asn: 65000, router_id: '127.0.0.1', 
-    komdigi_ip: '', komdigi_asn: 132644, komdigi_md5: '', 
-    mikrotik_ip: '', mikrotik_asn: 65000
+    enabled: false, local_asn: 65000, router_id: '127.0.0.1', peers: []
   });
 
   useEffect(() => {
@@ -128,6 +127,21 @@ function App() {
     const iv = setInterval(fetchStats, 2000);
     return () => clearInterval(iv);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'admin' && adminTab === 'bgp') {
+      const fetchBGPStatus = async () => {
+        try {
+          const res = await apiFetch('/api/bgp-status');
+          const data = await res.json();
+          setBgpStatus(Array.isArray(data) ? data : []);
+        } catch(e) {}
+      };
+      fetchBGPStatus();
+      const iv = setInterval(fetchBGPStatus, 5000);
+      return () => clearInterval(iv);
+    }
+  }, [activeTab, adminTab, isAuthenticated]);
 
   useEffect(() => {
     if (activeTab === 'dashboard') {
@@ -269,7 +283,7 @@ function App() {
       await apiFetch('/api/bgp-config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({...bgpConfig, local_asn: Number(bgpConfig.local_asn), komdigi_asn: Number(bgpConfig.komdigi_asn), mikrotik_asn: Number(bgpConfig.mikrotik_asn)})
+        body: JSON.stringify({...bgpConfig, local_asn: Number(bgpConfig.local_asn), peers: (bgpConfig.peers || []).map(p => ({...p, asn: Number(p.asn), multihop: Number(p.multihop)}))})
       });
       showNotification('BGP Configuration saved & Daemon reloaded!');
     } catch(e) { showNotification('Failed to update BGP Config', 'error'); }
@@ -1529,70 +1543,110 @@ function App() {
               {/* === TAB: BGP & RTBH === */}
               {adminTab === 'bgp' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3 pb-4 shadow-lg">
-                  <div className="p-6 border-b border-slate-800">
-                    <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                      <Globe className="w-6 h-6 text-orange-500" /> BGP & RTBH Komdigi
-                    </h2>
-                    <p className="text-slate-400 text-sm mt-3">Konfigurasikan sinkronisasi RTBH (Remotely Triggered Black Hole) dan GoBGP Route Reflector untuk mengarahkan trafik IP terblokir ke Laman Labuh secara dinamis tanpa over-blocking CDN.</p>
+                  <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                        <Globe className="w-6 h-6 text-orange-500" /> BGP Dynamic Peers
+                      </h2>
+                      <p className="text-slate-400 text-sm mt-2">Manage eBGP/iBGP topologies dynamically with real-time state monitoring.</p>
+                    </div>
                   </div>
                   <div className="p-6 space-y-6 flex-1 bg-slate-950/30">
-                    <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-800/50 bg-[#0b1120]">
-                      <div className="pt-1">
-                        <input type="checkbox" id="bgp_enabled" checked={bgpConfig.enabled} onChange={(e) => setBgpConfig({...bgpConfig, enabled: e.target.checked})} className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-orange-500 focus:ring-orange-500 focus:ring-offset-slate-900 cursor-pointer accent-orange-500" />
-                      </div>
-                      <div className="w-full">
-                        <label htmlFor="bgp_enabled" className="text-white font-semibold cursor-pointer text-base">Aktifkan GoBGP Route Reflector</label>
-                        <p className="text-slate-400 text-sm mt-1 mb-4 leading-relaxed">Menjalankan daemon BGP untuk menerima IP Blacklist dari eBGP (Server Pusat) dan menyebarkannya ke iBGP (Edge Router) dengan next-hop self agar terbaca sebagai Laman Labuh.</p>
-                        
-                        {bgpConfig.enabled && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-900 border border-slate-800 rounded-lg">
-                             <div>
-                               <h3 className="text-orange-400 font-bold mb-3 text-sm flex items-center gap-2"><Server className="w-4 h-4"/>Router Lokal (NetShield)</h3>
-                               <label className="block text-xs font-semibold text-slate-400 mb-1">Local ASN</label>
-                               <input type="number" value={bgpConfig.local_asn} onChange={e => setBgpConfig({...bgpConfig, local_asn: e.target.value})} className="w-full mb-3 bg-slate-950 border border-slate-700 focus:border-orange-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                               
-                               <label className="block text-xs font-semibold text-slate-400 mb-1">Router ID (IP Server Ini)</label>
-                               <input type="text" value={bgpConfig.router_id} onChange={e => setBgpConfig({...bgpConfig, router_id: e.target.value})} className="w-full mb-3 bg-slate-950 border border-slate-700 focus:border-orange-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                             </div>
-                             
-                             <div>
-                               <h3 className="text-blue-400 font-bold mb-3 text-sm flex items-center gap-2"><Globe className="w-4 h-4" />eBGP Peer (Komdigi)</h3>
-                               <label className="block text-xs font-semibold text-slate-400 mb-1">Neighbor IP</label>
-                               <input type="text" value={bgpConfig.komdigi_ip} onChange={e => setBgpConfig({...bgpConfig, komdigi_ip: e.target.value})} className="w-full mb-3 bg-slate-950 border border-slate-700 focus:border-blue-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                               
-                               <div className="flex gap-2 mb-3">
-                                 <div className="w-1/2">
-                                   <label className="block text-xs font-semibold text-slate-400 mb-1">Remote ASN</label>
-                                   <input type="number" value={bgpConfig.komdigi_asn} onChange={e => setBgpConfig({...bgpConfig, komdigi_asn: e.target.value})} className="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                                 </div>
-                                 <div className="w-1/2">
-                                   <label className="block text-xs font-semibold text-slate-400 mb-1">MD5 Password</label>
-                                   <input type="password" value={bgpConfig.komdigi_md5} onChange={e => setBgpConfig({...bgpConfig, komdigi_md5: e.target.value})} className="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                                 </div>
-                               </div>
-                             </div>
-
-                             <div className="md:col-span-2 border-t border-slate-800 pt-5 mt-1">
-                               <h3 className="text-emerald-400 font-bold mb-3 text-sm flex items-center gap-2"><ShieldCheck className="w-4 h-4"/>iBGP Peer (Edge Router ISP/Mikrotik)</h3>
-                               <div className="flex gap-4">
-                                 <div className="w-1/2">
-                                   <label className="block text-xs font-semibold text-slate-400 mb-1">Neighbor IP (Edge Router)</label>
-                                   <input type="text" value={bgpConfig.mikrotik_ip} onChange={e => setBgpConfig({...bgpConfig, mikrotik_ip: e.target.value})} className="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                                 </div>
-                                 <div className="w-1/2">
-                                   <label className="block text-xs font-semibold text-slate-400 mb-1">Remote ASN (Harus Sama Dengan Lokal)</label>
-                                   <input type="number" value={bgpConfig.mikrotik_asn} onChange={e => setBgpConfig({...bgpConfig, mikrotik_asn: e.target.value})} className="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 outline-none rounded-lg px-3 py-2 text-sm text-slate-300" />
-                                 </div>
-                               </div>
-                             </div>
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-900/50 border border-slate-800/80">
+                      <input type="checkbox" id="bgp_enabled" checked={bgpConfig.enabled} onChange={(e) => setBgpConfig({...bgpConfig, enabled: e.target.checked})} className="w-5 h-5 rounded border-slate-700 bg-slate-900 focus:ring-orange-500" />
+                      <label htmlFor="bgp_enabled" className="text-white font-semibold flex-1">Aktifkan GoBGP Route Reflector Daemon</label>
                     </div>
+                    
+                    {bgpConfig.enabled && (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4 p-4 border border-slate-800/50 rounded-lg bg-[#0b1120]">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1">Local ASN</label>
+                            <input type="number" value={bgpConfig.local_asn} onChange={e => setBgpConfig({...bgpConfig, local_asn: e.target.value})} className="w-full bg-slate-950 border border-slate-700 focus:border-orange-500 outline-none rounded-lg px-3 py-2 text-slate-300" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1">Router ID (Local IP)</label>
+                            <input type="text" value={bgpConfig.router_id} onChange={e => setBgpConfig({...bgpConfig, router_id: e.target.value})} className="w-full bg-slate-950 border border-slate-700 focus:border-orange-500 outline-none rounded-lg px-3 py-2 text-slate-300" />
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-800/50 pt-5">
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-white font-bold flex items-center gap-2"><Server className="w-5 h-5 text-indigo-400"/> Network Peers List</h3>
+                            <button onClick={() => setBgpConfig({...bgpConfig, peers: [...(bgpConfig.peers||[]), {id: Date.now().toString(), name:'New Peer', ip:'', asn: 65000, type:'ibgp', multihop:0, md5:'', enabled:true}]})} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-sm font-medium flex items-center gap-1 shadow-lg transition-colors"><Plus className="w-4 h-4"/> Tambah Peer</button>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            {(bgpConfig.peers || []).map((peer, idx) => {
+                              const liveStat = bgpStatus.find(s => s.conf?.neighbor_address === peer.ip);
+                              const isEstablished = liveStat?.state?.session_state === 6;
+                              return (
+                                <div key={peer.id} className="bg-slate-900 border border-slate-700/60 rounded-xl overflow-hidden relative">
+                                  <div className="h-1.5 w-full bg-slate-800 relative">
+                                    <div className={`absolute top-0 left-0 h-full ${isEstablished ? 'bg-emerald-500' : 'bg-rose-500'} transition-all`} style={{width: isEstablished?'100%':'20%'}}></div>
+                                  </div>
+                                  <div className="p-4">
+                                    <div className="flex justify-between mb-3">
+                                      <div className="flex items-center gap-2">
+                                        <select value={peer.type} onChange={e => {
+                                            const v = e.target.value;
+                                            const np = [...bgpConfig.peers]; np[idx].type = v;
+                                            if(v === 'ibgp') np[idx].asn = bgpConfig.local_asn;
+                                            setBgpConfig({...bgpConfig, peers: np});
+                                        }} className="bg-slate-800 text-xs text-white px-2 py-1 rounded font-mono font-bold outline-none border border-slate-600">
+                                          <option value="ibgp">iBGP</option>
+                                          <option value="ebgp">eBGP</option>
+                                        </select>
+                                        <input type="text" value={peer.name} onChange={e => {const np = [...bgpConfig.peers]; np[idx].name = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="bg-transparent text-white font-bold max-w-[120px] outline-none border-b border-transparent focus:border-indigo-500 text-sm" placeholder="Peer Name" />
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${isEstablished ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : liveStat ? 'border-amber-500/50 text-amber-400 bg-amber-500/10' : 'border-slate-600 text-slate-400 bg-slate-800/50'}`}>
+                                          {isEstablished ? `UP (Prefix: ${liveStat.state?.adj_table?.accepted || 0})` : liveStat ? 'CONNECTING/IDLE' : 'PENDING'}
+                                        </div>
+                                        <button onClick={() => {const np = [...bgpConfig.peers]; np.splice(idx,1); setBgpConfig({...bgpConfig, peers: np})}} className="text-slate-400 hover:text-rose-400"><Trash2 className="w-4 h-4"/></button>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                      <div>
+                                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">IP Address</label>
+                                        <input type="text" value={peer.ip} onChange={e => {const np = [...bgpConfig.peers]; np[idx].ip = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="10.0.0.1" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Remote ASN</label>
+                                        <input type="number" readOnly={peer.type === 'ibgp'} value={peer.asn} onChange={e => {const np = [...bgpConfig.peers]; np[idx].asn = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className={`w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs font-mono outline-none text-slate-300 ${peer.type === 'ibgp'?'opacity-50':''}`} />
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">MD5 Secret</label>
+                                        <input type="password" value={peer.md5} onChange={e => {const np = [...bgpConfig.peers]; np[idx].md5 = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="Optional" />
+                                      </div>
+                                      {peer.type === 'ebgp' && (
+                                        <div>
+                                          <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">EBGP Multihop</label>
+                                          <input type="number" value={peer.multihop} onChange={e => {const np = [...bgpConfig.peers]; np[idx].multihop = e.target.value; setBgpConfig({...bgpConfig, peers: np})}} className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded px-2 py-1.5 text-xs text-slate-300 font-mono outline-none" placeholder="0 (Disabled)" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {(bgpConfig.peers?.length || 0) === 0 && (
+                                <div className="col-span-full border-2 border-dashed border-slate-800 rounded-xl p-8 flex flex-col items-center text-center">
+                                  <Server className="w-12 h-12 text-slate-600 mb-3" />
+                                  <h3 className="text-slate-300 font-bold mb-1">Belum Ada Router Peer</h3>
+                                  <p className="text-slate-500 text-sm">Tambahkan perangkat eBGP (Komdigi) atau iBGP (Edge Router lokal) untuk mendistribusikan Blackhole ke Laman Labuh.</p>
+                                </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end px-6">
                     <button onClick={saveBGPConfig} className="px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold tracking-wide rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(234,88,12,0.3)] transition-colors cursor-pointer">
-                       Terapkan Konfigurasi BGP
+                       Deploy Konfigurasi
                     </button>
                   </div>
                 </div>
