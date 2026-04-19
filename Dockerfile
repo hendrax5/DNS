@@ -21,10 +21,16 @@ RUN clang -O2 -target bpf -c dns_filter.c -o dns_filter.o && \
     (echo "⚠️ XDP compilation failed" && touch dns_filter.o)
 
 
-# Final Stage: PowerDNS + Supervisord + XDP
+# Final Stage: PowerDNS + Supervisord + XDP + GoBGP
 FROM alpine:latest
 RUN apk add --no-cache supervisor dnsdist pdns-recursor lua sqlite tzdata bind-tools numactl curl \
-    iproute2 bpftool
+    iproute2 bpftool && \
+    curl -sL https://github.com/osrg/gobgp/releases/download/v3.31.0/gobgp_3.31.0_linux_amd64.tar.gz -o gobgp.tar.gz && \
+    tar -xzf gobgp.tar.gz && \
+    mv gobgpd /usr/local/bin/ && \
+    mv gobgp /usr/local/bin/ && \
+    rm gobgp.tar.gz && \
+    touch /etc/gobgpd.toml
 
 ENV TZ=Asia/Jakarta
 RUN cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
