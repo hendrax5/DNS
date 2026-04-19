@@ -112,6 +112,11 @@ function App() {
     enabled: false, local_asn: 65000, router_id: '127.0.0.1', peers: []
   });
 
+  // OTA Config
+  const [otaStatus, setOtaStatus] = useState({ current_version: '', available_branches: [] });
+  const [selectedBranch, setSelectedBranch] = useState('main');
+  const [updateProgress, setUpdateProgress] = useState(null);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -129,6 +134,35 @@ function App() {
     const iv = setInterval(fetchStats, 2000);
     return () => clearInterval(iv);
   }, []);
+
+  const fetchOtaStatus = async () => {
+    try {
+      const res = await apiFetch('/api/sys-update/check');
+      const data = await res.json();
+      setOtaStatus(data);
+      if (data.available_branches && data.available_branches.length > 0) setSelectedBranch(data.available_branches[0]);
+    } catch(e){}
+  };
+
+  const triggerOtaUpdate = async () => {
+    if(!confirm('Sistem akan di-rebuild dan direstart secara luring dalam waktu +- 30 detik. Koneksi Dashboard akan terputus sesaat. Lanjutkan Update?')) return;
+    setUpdateProgress('Memulai Update Firmware...');
+    await apiFetch('/api/sys-update/pull', { method: 'POST', body: JSON.stringify({branch: selectedBranch}) });
+    
+    const intv = setInterval(async () => {
+        try {
+            const r = await apiFetch('/api/sys-update/status');
+            const d = await r.json();
+            setUpdateProgress(d.status);
+            if(d.status === 'Standby') {
+                clearInterval(intv);
+                setUpdateProgress(null);
+                window.location.reload();
+            }
+        } catch(e){}
+    }, 4000);
+  };
+
 
   useEffect(() => {
     if (activeTab === 'admin' && adminTab === 'bgp') {
@@ -216,11 +250,13 @@ function App() {
 
       const resDig = await apiFetch('/api/dig-targets');
       const dataDig = await resDig.json();
+      const resBGP = await apiFetch('/api/bgp-config');
+      fetchOtaStatus();
+
       if(dataDig.targets) {
           setDigTargetsText(dataDig.targets.map(t=>t.domain).join('\n'));
       }
 
-      const resBGP = await apiFetch('/api/bgp-config');
       const dataBGP = await resBGP.json();
       if(dataBGP) setBgpConfig(dataBGP);
     } catch(e) { console.error(e) }
@@ -779,6 +815,7 @@ function App() {
               <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Kontrol Akses</button>
               <button onClick={() => setAdminTab('options')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'options' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Server className="w-4 h-4 inline-block mr-2" />Opsi Keamanan</button>
               <button onClick={() => setAdminTab('bgp')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'bgp' ? 'bg-orange-600 text-white shadow-[0_0_15px_rgba(234,88,12,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />BGP & RTBH (Komdigi)</button>
+              <button onClick={() => setAdminTab('ota')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'ota' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><RefreshCw className="w-4 h-4 inline-block mr-2" />Sistem OTA</button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -1706,6 +1743,59 @@ function App() {
                     <button onClick={saveBGPConfig} className="px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold tracking-wide rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(234,88,12,0.3)] transition-colors cursor-pointer">
                        Deploy Konfigurasi
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* === TAB: OTA UPDATE === */}
+              {adminTab === 'ota' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden col-span-full">
+                  <div className="p-6 border-b border-slate-800 bg-gradient-to-r from-rose-900/30 to-slate-900">
+                    <h2 className="text-xl font-bold flex items-center gap-3 text-white">
+                      <RefreshCw className="w-6 h-6 text-rose-400" />
+                      NetShield Update Center (Luring OS)
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-3 leading-relaxed max-w-3xl">
+                      Perbarui sistem operasi secara luring (OTA Image) dengan menarik Firmware dari Git Server tanpa memutus fungsi DNS Lunas. 
+                      Sistem NetShield V5 ditanamkan secara otonom dalam OS Host (ISO). 
+                    </p>
+                  </div>
+                  <div className="p-8 flex flex-col md:flex-row gap-8 items-start">
+                    <div className="flex-1 bg-slate-950 p-6 rounded-xl border border-slate-800/80 w-full relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                           Appliance Active
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Versi Saat Ini</h3>
+                      <div className="text-4xl font-black text-white mb-6 font-mono bg-gradient-to-r from-indigo-400 to-rose-400 bg-clip-text text-transparent">
+                          {otaStatus.current_version || 'Unknown'}
+                      </div>
+                      
+                      {updateProgress ? (
+                         <div className="w-full mt-6">
+                            <label className="block text-xs font-bold text-rose-400 uppercase tracking-widest mb-3 animate-pulse">{updateProgress}</label>
+                            <div className="h-4 w-full bg-slate-800 rounded-full overflow-hidden relative border border-slate-700">
+                               <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-rose-500 to-indigo-500 animate-pulse w-full origin-left scale-x-[0.5] transition-all"></div>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-4 font-mono">Tunggu 30 detik... Dashboard akan *auto-refresh* segera setelah sistem menyala ulang secara sunyi.</p>
+                         </div>
+                      ) : (
+                         <div className="w-full mt-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Pilih Celah Rilis (Branch)</label>
+                                <select value={selectedBranch} onChange={e => setSelectedBranch(e.target.value)} className="w-full lg:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white font-bold outline-none focus:border-rose-500 transition-colors shadow-inner">
+                                    {(otaStatus.available_branches || []).map(b => (
+                                        <option key={b} value={b}>Release: {b.toUpperCase()}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button onClick={triggerOtaUpdate} className="bg-rose-600 hover:bg-rose-500 text-white px-6 py-3 rounded-lg font-bold text-sm flex items-center gap-2 shadow-[0_0_20px_rgba(225,29,72,0.4)] transition-transform hover:scale-105">
+                                <RefreshCw className="w-4 h-4" /> Unduh & Perbarui Otomatis
+                            </button>
+                         </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

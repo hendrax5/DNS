@@ -281,6 +281,10 @@ func main() {
 	admin.Get("/top-domains", GetTopDomains)
 	admin.Get("/upstream-health", GetUpstreamHealth)
 
+	admin.Get("/sys-update/check", CheckSysUpdate)
+	admin.Post("/sys-update/pull", PullSysUpdate)
+	admin.Get("/sys-update/status", GetSysUpdateStatus)
+
 	admin.Get("/xdp/stats", GetXDPStatsAPI)
 	admin.Post("/xdp/toggle", ToggleXDP)
 
@@ -1701,6 +1705,45 @@ func GetDigHealth(c *fiber.Ctx) error {
 
 	wg.Wait()
 	return c.JSON(fiber.Map{"health": results})
+}
+
+// Update OTA Logic
+type PullRequest struct {
+	Branch string `json:"branch"`
+}
+
+func CheckSysUpdate(c *fiber.Ctx) error {
+	// Di skenario Appliance nyata, kita query branch GitHub
+	// Sebagai MVP, kita sediakan dua branch keras: main & dev
+	return c.JSON(fiber.Map{
+		"current_version": "5.0-Appliance",
+		"available_branches": []string{"main", "dev"},
+	})
+}
+
+func PullSysUpdate(c *fiber.Ctx) error {
+	var req PullRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+
+	if req.Branch == "" {
+		req.Branch = "main"
+	}
+
+	// Tulis trigger file untuk dieksekusi Watchdog Host (ISO)
+	os.WriteFile("/data/do-update", []byte(req.Branch), 0644)
+	os.WriteFile("/data/update-status", []byte("Memulai OTA Update ke "+req.Branch+"..."), 0644)
+
+	return c.JSON(fiber.Map{"status": "Update Triggered. Sistem akan memulai ulang dalam beberapa detik."})
+}
+
+func GetSysUpdateStatus(c *fiber.Ctx) error {
+	data, err := ioutil.ReadFile("/data/update-status")
+	if err != nil {
+		return c.JSON(fiber.Map{"status": "Standby"})
+	}
+	return c.JSON(fiber.Map{"status": string(data)})
 }
 
 func GetCustomLists(c *fiber.Ctx) error {
