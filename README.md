@@ -162,4 +162,38 @@ Jika warna Lencana indikator *Peer* pada kontrol sentral Anda tak kunjung memanc
 
 ---
 
+## 🌐 Panduan Pengalihan Trafik DNS (*Force Forwarding*)
+
+Agar pelanggan secara transparan dikristalisasi oleh lapis baja NetShield tanpa perlu mengatur manual setelan *IP Resolver* di setiap gawai mereka, belokkanlah paksa arus paket UDP/TCP port 53 menuju alamat IP peladen pelindung kita (Misal diasumsikan berdiri pada IP `10.10.10.2`). 
+
+### 1. MikroTik RouterOS
+Berikut adalah *syntax* peretasan arah trayek DNS pada tataran *Firewall NAT* untuk arsitektur sasis RouterBoard:
+```mikrotik
+/ip firewall nat
+add action=dst-nat chain=dstnat comment="Mencegat trafik DNS UDP Publik ke arah NetShield" \
+    dst-port=53 protocol=udp to-addresses=10.10.10.2 to-ports=53 \
+    src-address-list="IP_PELANGGAN_ISP"
+add action=dst-nat chain=dstnat comment="Mencegat trafik DNS TCP Publik ke arah NetShield" \
+    dst-port=53 protocol=tcp to-addresses=10.10.10.2 to-ports=53 \
+    src-address-list="IP_PELANGGAN_ISP"
+```
+*(Harap awasi jika Anda merekam *log* DNS dari IP Router ini untuk memastikan bahwa *Src-NAT* tidak turut menutupi IP Pelanggan yang asli).*
+
+### 2. Juniper Networks (Junos OS)
+Pengguna jenjang operasional teratas yang memiliki unit Juniper tipe *SRX* atau penunjang kelaziman lini yang lain, dapat menerapkan konstelasi *Destination NAT*:
+```junos
+set security nat destination pool POOL_NETSHIELD_DNS address 10.10.10.2/32
+set security nat destination pool POOL_NETSHIELD_DNS port 53
+
+set security nat destination rule-set HIJACK_DNS from zone Z_SUBSCRIBER
+set security nat destination rule-set HIJACK_DNS rule MENCEGAT_UDP53 match destination-port 53
+set security nat destination rule-set HIJACK_DNS rule MENCEGAT_UDP53 match protocol udp
+set security nat destination rule-set HIJACK_DNS rule MENCEGAT_UDP53 then destination-nat pool POOL_NETSHIELD_DNS
+
+set security nat destination rule-set HIJACK_DNS rule MENCEGAT_TCP53 match destination-port 53
+set security nat destination rule-set HIJACK_DNS rule MENCEGAT_TCP53 match protocol tcp
+set security nat destination rule-set HIJACK_DNS rule MENCEGAT_TCP53 then destination-nat pool POOL_NETSHIELD_DNS
+```
+---
+
 *Dibangun dengan presisi untuk kecepatan dan keamanan absolut.* 🦅

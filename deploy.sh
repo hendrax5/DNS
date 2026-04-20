@@ -101,6 +101,9 @@ do_docker_rebuild() {
         echo " ❌ FATAL ERROR: Gagal menjalankan kontainer netshield-v2!"
         exit 1
     fi
+
+    echo "[Docker] Membersihkan sisa-sisa image lama (Prune)..."
+    docker system prune -a -f
 }
 
 show_post_deploy() {
