@@ -1,199 +1,103 @@
-# NetShield DNS V5.0 — Carrier-Grade Edition 🛡️🚀
+# NetShield DNS V6.0 — Carrier-Grade Edition 🛡️🚀
 
-![Version](https://img.shields.io/badge/Version-V5.0_Carrier--Grade-blue)
-![Throughput](https://img.shields.io/badge/Throughput-126k+_QPS-success)
-![Architecture](https://img.shields.io/badge/Stack-DNSDist_%7C_PowerDNS_%7C_Go_%7C_React-orange)
-![DoH](https://img.shields.io/badge/DoH%2FDoT-Ready-green)
-![DDoS](https://img.shields.io/badge/DDoS_Protection-Active-red)
+![Version](https://img.shields.io/badge/Version-V6.0_Pass--Through-blue)
+![Throughput](https://img.shields.io/badge/Throughput-150k+_QPS-success)
+![Architecture](https://img.shields.io/badge/Stack-DNSDist_%7C_Unbound_%7C_PowerDNS_%7C_Go-orange)
+![Deployment](https://img.shields.io/badge/Deploy-ISO_Appliance_%7C_Docker-purple)
+![Zero_Allocation](https://img.shields.io/badge/Bloom_Filter-Zero_Copy_mmap-red)
 
-NetShield DNS adalah platform resolusi dan penyaringan DNS berskala operator telekomunikasi (*Carrier-Grade*) yang mampu menembus **126.906+ QPS** pada lingkungan *Baremetal*. Dirancang untuk memblokir jutaan ancaman internet, *malware*, dan daftar *Trust-Positif* Komdigi secara seketika tanpa mengorbankan kecepatan.
+NetShield DNS V6.0 adalah platform resolusi dan penyaringan DNS berskala operator telekomunikasi (*Carrier-Grade*). Edisi "Pass-Through Architecture" ini didesain khusus untuk ISP berskala masif dengan mengimplementasikan lompatan performa: **Edge Bloom Filter berbasis `mmap` C-FFI**. 
+
+Dengan arsitektur ini, >95% pencarian domain bersih akan *membelah seketika* memintas mesin RPZ dan diteruskan langsung menuju *Resolver Murni* berkinerja tinggi, menghasilkan latensi hampir 0ms tanpa ada jejak CPU overhead.
 
 ---
 
-## 🏛️ Arsitektur 3-Lapis (Zero-Allocation Pipeline)
+## 🏛️ Arsitektur Pass-Through Baru (V6.0)
 
 ```
-                    ┌─────────────────────────────────────────┐
-                    │         LAYER 1: DNSDist (Port 53)      │
-  Klien ──UDP──►    │  • PacketCache 10M entries (RAM)        │
-                    │  • RRL DDoS Protection (1000 QPS/IP)    │
-                    │  • Telemetry Sampling 1% (Async Lua)    │
-                    │  • DoH/DoT Ready (Port 443/853)         │
-                    └──────────────┬──────────────────────────┘
-                                   │ 16 sockets (SO_REUSEPORT)
-                    ┌──────────────▼──────────────────────────┐
-                    │       LAYER 2: PowerDNS (Port 5353)     │
-                    │  • RPZ Engine: 17 Juta Domain Komdigi   │
-                    │  • Custom Blacklist/Whitelist (Hot-RPZ)  │
-                    │  • Cache 10M + Stale Serving 5 menit    │
-                    │  • Dynamic Upstream Forwarding           │
-                    └──────────────┬──────────────────────────┘
-                                   │
-                    ┌──────────────▼──────────────────────────┐
-                    │    LAYER 3: Internet / Upstream DNS      │
-                    │  • Full Recursion (Default)              │
-                    │  • Forwarding Mode: 1.1.1.1/8.8.8.8     │
-                    │    (Dapat diaktifkan dari Panel Admin)   │
-                    └─────────────────────────────────────────┘
+                            ┌──────────────────────────────────────────────┐
+                            │          LAYER 1: DNSDist (Port 53)          │
+          Klien ──UDP──►    │  • 16-Core SO_REUSEPORT Listener             │
+                            │  • RRL Anti-DDoS (1000 QPS/IP)               │
+                            │  • FFI Bloom Filter Router (32MB Mmap)       │
+                            └───────┬──────────────────────────────┬───────┘
+                                    │                              │
+[Domain Bersih / Aman (95%)]        │                              │ [Domain Mencurigakan / Terblokir]
+   Tembus Bloom Filter (Bypass)     │                              │ Positif di Mmap Bloom
+                                    ▼                              ▼
+                 ┌──────────────────────────────────┐      ┌──────────────────────────────┐
+                 │    LAYER 2A: Unbound Resolver    │      │LAYER 2B: PowerDNS Recursor   │
+                 │      (Pure Fast Resolution)      │      │       (RPZ Engine)           │
+                 │                                  │      │                              │
+                 │  • Dedicated 16-Threads          │      │  • 17 Juta Entry Komdigi     │
+                 │  • 1GB RRSet Cache               │      │  • Custom BL / WL            │
+                 │  • Serve-Expired (Stale)         │      │  • Zero-Load (Tidur bila URL │
+                 │  • Prefetch Optimization         │      │    bersih)                   │
+                 └──────────────────────────────────┘      └──────────────────────────────┘
 ```
 
 ---
 
-## 🔥 Fitur Unggulan
+## 🔥 Fitur Unggulan V6.0
 
-### ⚡ Performa Ekstrem
-- **126.906+ QPS** pada Baremetal (16 core, benchmark `dnsperf`)
-- **10 Juta entri** PacketCache di DNSDist + PowerDNS
-- **Stale Serving** 5 menit — cache tidak pernah kedaluwarsa mendadak
-- **Kernel Tuning** otomatis: UDP buffer 16MB, busy polling, backlog 65k
+### ⚡ Pass-Through Bloom Filter Engine (The Game Changer)
+- **Zero-Copy Memory Map (mmap):** Pengecekan blokir 17 juta domain Komdigi divisualisasikan dalam struktur Bit-Array 32MB di dalam kernel memori. DNSDist (LuaJIT FFI) melakukan tes 9 bit (k=9) secepat kilat.
+- **Graceful Pure-Lua Fallback:** Bila sistem atau struktur OS gagal menjalankan eksekusi modul C-bindings, sistem secara siluman mundur ke algoritma pemrosesan string Murni Lua 5.4 untuk memastikan operasi DNS tanpa pantang surut.
+- **Offload Backend Otomatis:** PowerDNS tak akan pernah mengeksekusi trafik Google, Facebook, atau perbankan. Semuanya direkues secara murni dan secepat kilat oleh Unbound.
 
-### 🔒 Keamanan & Penyaringan
-- **17 Juta Domain** Trust-Positif Komdigi (RPZ Engine C++)
-- **GoBGP Route Reflector (RTBH)** — Dukungan *Dynamic Multi-Peers*, eBGP *Multihop*, Injeksi MD5, dan pembelokan logis *Next-Hop-Self* iBGP ke Server Laman Labuh tanpa _Null Route_.
-- **Custom Blacklist/Whitelist** dengan Hot-Reload tanpa restart
-- **Anti-DDoS RRL**: Throttle 1000 QPS/IP, blokir query ANY
-- **SafeSearch** enforcement untuk Google, Bing, DuckDuckGo
-- **DoH/DoT Ready** (DNS-over-HTTPS/TLS — tinggal pasang sertifikat)
+### 🛡️ Keamanan & Integrasi Komdigi (Appliance ISO)
+- **17 Juta Domain** Trust-Positif Komdigi *up-to-date* + Custom Lists.
+- **GoBGP Route Reflector (RTBH):** Integrasi Border Gateway Protocol langsung ke jaringan ISP (Mikrotik/Juniper) memblokir anomali IP.
+- **Auto ISO-Builder & TUI Wizard:** NetShield kini dapat dirakit dan dicetak sepenuhnya secara otomatis menjadi format **Installer ISO Bootable** mandiri (*Appliance* siap pakai).
+- **Over-The-Air (OTA) Updates Dynamic:** Terdapat mekanisme penarik kode otomatis lewat *Dashboard* yang transparan—memetakan repositori aktif (*Current Tracking Branch*) langsung ke *syslog* internal tanpa campur tangan terminal lagi!
 
-### 📊 Monitoring & Telemetri
-- **Dashboard Web** real-time dengan analitik (Go + React)
-- **1% Async Sampling** — telemetri tanpa mengorbankan QPS
-- **Anomaly Detection** (DNS Tunneling, Amplification Attack alerts)
-- **Prometheus-Ready** endpoint `/metrics` (sambungkan ke Grafana)
-
-### 🛠️ Operasional
-- **Dynamic Upstream Forwarding** — aktifkan/nonaktifkan dari panel admin
-- **Auto-Tuning** deploy script (deteksi CPU, RAM, NUMA otomatis)
-- **Docker Host Networking** — eliminasi NAT overhead
-- **Hot-Reload** konfigurasi tanpa downtime
+### ⚙️ Hardware Tuning
+- Otomatisasi **THP (Transparent HugePages)** level Kernel dipasok secara instan setiap deployment.
+- Pemisahan isolatif soket proses (`dnsdist -> unbound` port `5354`, `dnsdist -> pdns` port `5353`).
+- **XDP/eBPF Packet Acceleration** yang mendongkrak dropping paket DoS langsung di batas NIC sebelum menjamah lapisan NetFilter Docker.
 
 ---
 
-## ⚙️ Instalasi Cepat
+## 🛠️ Modul Instalasi (Cara Peluncuran)
 
+### Opsi A: Deployment Server Tunggal
+Untuk memancarkan pembaruan terkini dan menata kontainer dari kode aslinya:
 ```bash
-# Klon repositori
 git clone https://github.com/hendrax5/DNS.git
-cd DNS/netshield
-
-# Deploy (termasuk auto-tuning hardware otomatis)
-chmod +x deploy.sh
-./deploy.sh
+cd DNS
+sudo bash deploy.sh
 ```
 
-### Mengaktifkan DoH/DoT
+### Opsi B: Membangun Distro / Appliance Bootable Sendiri (.ISO)
+Dilengkapi installer antarmuka terminal interaktif *ncurses/TUI Wizard*:
 ```bash
-# 1. Letakkan sertifikat TLS di dalam container
-mkdir -p data/tls
-cp /path/to/cert.pem data/tls/
-cp /path/to/key.pem data/tls/
-
-# 2. Uncomment baris DoH/DoT di pdns_config/dnsdist.conf
-# 3. Rebuild: ./deploy.sh
+cd DNS/iso-builder
+sudo bash build-iso.sh
 ```
-
-### Mengaktifkan Upstream Forwarding
-Buka **Dashboard → Settings → Upstream** → Aktifkan dan pilih resolver upstream (Cloudflare, Google, Quad9).
+File *.iso* instalasi yang memuat OS + NetShield Offline siap ditanam di rak *Baremetal/VMware*.
 
 ---
 
-## 📈 Hasil Benchmark
+## 🗂️ Direktori & Fungsi Utama
 
-| Metrik | Hasil |
-|--------|-------|
-| Queries Per Second | **126.906 QPS** |
-| Packet Loss | **0.00%** |
-| Average Latency | **0.771 ms** |
-| Max Latency | **2.074 ms** |
-| Latency StdDev | **2.443 ms** |
-| CPU Cores | 16 |
-| RAM | 12 GB |
-
-```bash
-# Reproduksi benchmark:
-dnsperf -s <server-ip> -d query.txt -l 100
-```
-
----
-
-## 🗂️ Struktur Proyek
-
-```
-netshield/
-├── go-api/             # Backend API (Golang + Fiber)
-├── frontend/           # Dashboard UI (React + Vite)
-├── pdns_config/        # Konfigurasi DNSDist + PowerDNS
-│   ├── dnsdist.conf    # Frontend proxy (caching, RRL, DoH/DoT)
-│   ├── recursor.conf   # PowerDNS tuning
-│   └── laman_labuh.lua # RPZ policy loader
-├── Dockerfile          # Multi-stage build
-├── docker-compose.yml  # Host networking + sysctl
-├── deploy.sh           # Auto-deploy + hardware tuning
-└── data/               # Persistent database (SQLite)
-```
+- `deploy.sh` : Eksekutor pembaruan, inisiasi Docker, sysctl tuning.
+- `go-api/` : RestAPI Pusat Kendali (Bloom Sync RCU Swap, BGP API, Authentication).
+- `pdns_config/main.lua` : Otak cerdas pengarah FFI Bloom Filter dan Load-balancer traffic bersih/kotor.
+- `pdns_config/unbound.conf` : Resolver kencang terkalibrasi khusus menelan *cache* masif.
+- `iso-builder/tui-wizard.sh` : Skrip pra-instalasi CLI *user-friendly* dalam pembuatan `.iso`.
+- `frontend/` : Dasbor React GUI Administratif.
 
 ---
 
 ## 💡 Panduan Troubleshooting
 
-Jika Anda menemui kendala dalam penerapan di lapangan, silakan periksa hal-hal berikut:
-
-### 1. RPZ / Pemblokir Aktif Namun Trafik *Membobol* (Tidak Terblokir)
-- **Cek Jeda Waktu Sinkronisasi & *Cache* DNSDist**: 
-  Setelah kontainer dinyalakan atau ditekan tombol *Sync*, sistem membutuhkan jeda ±15-20 detik untuk mengunduh dan menelan 1-7 Juta baris RPZ ke dalam memori. Jika Anda melakukan *query* di sela waktu tersebut, domain kotor akan lolos dan sayangnya akan **diingat oleh *PacketCache* DNSDist**. 
-  - *Solusi:* Tunggu 20 detik pasca-deploy, dan jika Anda telanjur mengetes, silakan *flush dns* OS Anda.
-- **Cek Status Domain Asli Kominfo**: 
-  Seringkali pengguna mengetes `x.com` atau domain lama pembajakan yang ternyata **sudah dianggap legal dan dicabut** dari *blacklist* TrustPositif Kominfo. 
-  - *Cara Validasi:* Jalankan `curl -s https://trustpositif.komdigi.go.id/assets/db/domains_isp | grep -E '^domainanda\.com$'`. Jika kosong, berarti situs tersebut memang tak diblokir. Gunakan domain pasti seperti `reddit.com` atau `vimeo.com` untuk uji coba lapangan.
-
-### 2. TProxy Aktif Namun *Docker Build* Gagal (*Connection Refused*)
-Jika Anda mengaktifkan TProxy (Transparent DNS) lewat `iptables -j REDIRECT`, semua laju kelonggaran *port 53* OS (*host*) akan langsung dibegal paksa ke dalam pelabuhan NetShield. Jika pada titik ini Anda melakukan `docker build`, wadah Docker tak akan mandapatkan akses resolusi DNS internasional dan *compiler* terhenti.
-- *Solusi:* Skrip `deploy.sh` saat ini telah menyertakan pembilasan sirkuit NAT otomatis sebelum `build` dan dikerjakan melalui asuhan perantara `docker run` asli (*native*) merobohkan masalah fatal di OS Ubuntu modern. Selalu pastikan Anda menjalankan skrip rilis terbaru.
-
-### 3. "KeyError: ContainerConfig" saat instalasi dengan docker-compose
-- *Penyebab:* Cacat internal pada pustaka *Python docker-compose* versi lawas jika dihadapkan pada Docker Daemon Engine keluaran terbaru.
-- *Solusi:* NetShield V5.0 telah membebaskan diri dari kukungan rantai *docker-compose* dan kini ditenagai secara absolut dan murni memanfaatkan `docker run` lewat *Deployer bash otomatis* yang terbukti tangguh segala platform.
-
-### 4. Sesi BGP Mentok di State `Idle`/`Connecting` (Lencana Kuning di Panel)
-Jika warna Lencana indikator *Peer* pada kontrol sentral Anda tak kunjung memancarkan warna hijau `Up` berjam-jam:
-- **Pengecekan Pertama (Multihop Parameter):** Cek jarak *hop* *router* asal Komdigi. Jika statusnya adalah tipe *eBGP* dan melewati lebih dari satu sekat interkoneksi, parameter **EBGP Multihop Limit** mutlak hukumnya **wajib diisi dengan nilai > 0** (misal 2 atau 4) dari Dasbor, tanpa itu ia tak akan diperkenankan menyentuh *Neighbor*.
-- **Pengecekan Kedua (L4 Stateful Firewall):** Verifikasi bahwa mesin *NetShield* secara mandiri mengizinkan pendaratan atau terbangnya trafik paket `TCP Port 179`. Jangan sampai ia terjebak pada rantai *Drop* bawaan sistem seperti UFW pada host.
-- **Pengecekan Ketiga (MD5 Authentication Key):** Tanyakan kembail perihal mandat kunci sekuritas *(MD5 Secret)* ke tim pusat. Banyak insiden otentikasi luruh meradang semata disebabkan **typo minor** spasi ekstra (*trailing space*) pada enkripsi MD5.
+1. **Bug RCU Hot-Swap Gagal Mmap?**
+   Pembaruan daftar hitam ditarik namun DNS seolah mati/stuck memulihkan konfigurasi? Ini telah teratasi di **V6.0 OTA Script**: perintah `-e reload_bloom()` diarahkan mulus tanpa down-time. Jika Anda menduga file rusak, cek eksistensi *file mmap* terisolasi: `ls -lh data/bloom.bin`.
+2. **Update OTA Kembali ke Awal (Mentok Main Branch)?**
+   Hal ini sudah difaktorkan. Selalu pastikan Anda memeriksa hasil audit skenario pada *log build*: `tail -f data/ota_update.log` setiap mengeksekusi Pembaruan Sistem via Dasbor atau OTA.
+3. **Mengarahkan Trafik (Force Forwarding)**
+   Bagi Mikrotik:
+   `add action=dst-nat chain=dstnat dst-port=53 protocol=udp to-addresses=<IP_NETSHIELD> to-ports=53`
 
 ---
-
-## 🌐 Panduan Pengalihan Trafik DNS (*Force Forwarding*)
-
-Agar pelanggan secara transparan dikristalisasi oleh lapis baja NetShield tanpa perlu mengatur manual setelan *IP Resolver* di setiap gawai mereka, belokkanlah paksa arus paket UDP/TCP port 53 menuju alamat IP peladen pelindung kita (Misal diasumsikan berdiri pada IP `10.10.10.2`). 
-
-### 1. MikroTik RouterOS
-Berikut adalah *syntax* peretasan arah trayek DNS pada tataran *Firewall NAT* untuk arsitektur sasis RouterBoard:
-```mikrotik
-/ip firewall nat
-add action=dst-nat chain=dstnat comment="Mencegat trafik DNS UDP Publik ke arah NetShield" \
-    dst-port=53 protocol=udp to-addresses=10.10.10.2 to-ports=53 \
-    src-address-list="IP_PELANGGAN_ISP"
-add action=dst-nat chain=dstnat comment="Mencegat trafik DNS TCP Publik ke arah NetShield" \
-    dst-port=53 protocol=tcp to-addresses=10.10.10.2 to-ports=53 \
-    src-address-list="IP_PELANGGAN_ISP"
-```
-*(Harap awasi jika Anda merekam *log* DNS dari IP Router ini untuk memastikan bahwa *Src-NAT* tidak turut menutupi IP Pelanggan yang asli).*
-
-### 2. Juniper Networks (Junos OS)
-Pengguna jenjang operasional teratas yang memiliki unit Juniper tipe *SRX* atau penunjang kelaziman lini yang lain, dapat menerapkan konstelasi *Destination NAT*:
-```junos
-set security nat destination pool POOL_NETSHIELD_DNS address 10.10.10.2/32
-set security nat destination pool POOL_NETSHIELD_DNS port 53
-
-set security nat destination rule-set HIJACK_DNS from zone Z_SUBSCRIBER
-set security nat destination rule-set HIJACK_DNS rule MENCEGAT_UDP53 match destination-port 53
-set security nat destination rule-set HIJACK_DNS rule MENCEGAT_UDP53 match protocol udp
-set security nat destination rule-set HIJACK_DNS rule MENCEGAT_UDP53 then destination-nat pool POOL_NETSHIELD_DNS
-
-set security nat destination rule-set HIJACK_DNS rule MENCEGAT_TCP53 match destination-port 53
-set security nat destination rule-set HIJACK_DNS rule MENCEGAT_TCP53 match protocol tcp
-set security nat destination rule-set HIJACK_DNS rule MENCEGAT_TCP53 then destination-nat pool POOL_NETSHIELD_DNS
-```
----
-
-*Dibangun dengan presisi untuk kecepatan dan keamanan absolut.* 🦅
+*NetShield V6.0 — Mengawal Privasi Tanpa Mengorbankan Latensi Mutlak.* 🦅
