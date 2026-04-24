@@ -284,6 +284,7 @@ func main() {
 	admin.Get("/sys-update/check", CheckSysUpdate)
 	admin.Post("/sys-update/pull", PullSysUpdate)
 	admin.Get("/sys-update/status", GetSysUpdateStatus)
+	admin.Get("/sys-update/log", GetSysUpdateLog)
 
 	admin.Get("/xdp/stats", GetXDPStatsAPI)
 	admin.Post("/xdp/toggle", ToggleXDP)
@@ -1747,6 +1748,14 @@ func GetSysUpdateStatus(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "Standby"})
 	}
 	return c.JSON(fiber.Map{"status": string(data)})
+}
+
+func GetSysUpdateLog(c *fiber.Ctx) error {
+	data, err := ioutil.ReadFile("/data/ota_update.log")
+	if err != nil {
+		return c.JSON(fiber.Map{"log": "Tidak ada riwayat log OTA yang tersedia."})
+	}
+	return c.JSON(fiber.Map{"log": string(data)})
 }
 
 func GetCustomLists(c *fiber.Ctx) error {

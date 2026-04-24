@@ -116,6 +116,7 @@ function App() {
   const [otaStatus, setOtaStatus] = useState({ current_version: '', available_branches: [] });
   const [selectedBranch, setSelectedBranch] = useState('main');
   const [updateProgress, setUpdateProgress] = useState(null);
+  const [otaLogText, setOtaLogText] = useState('');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -141,6 +142,14 @@ function App() {
       const data = await res.json();
       setOtaStatus(data);
       if (data.available_branches && data.available_branches.length > 0) setSelectedBranch(data.available_branches[0]);
+    } catch(e){}
+  };
+
+  const fetchOtaLog = async () => {
+    try {
+      const res = await apiFetch('/api/sys-update/log');
+      const data = await res.json();
+      setOtaLogText(data.log || '');
     } catch(e){}
   };
 
@@ -1795,6 +1804,18 @@ function App() {
                             </button>
                          </div>
                       )}
+                      
+                      {/* Log Viewer Trigger */}
+                      <div className="mt-6 pt-6 border-t border-slate-800">
+                          <button onClick={fetchOtaLog} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold transition-colors">
+                            Muat Ulang Log Instalasi Sebelumnya
+                          </button>
+                          {otaLogText && (
+                            <div className="mt-3 bg-black/50 border border-slate-700/50 p-4 rounded-lg overflow-x-auto">
+                              <pre className="text-[10px] text-slate-400 font-mono whitespace-pre-wrap">{otaLogText}</pre>
+                            </div>
+                          )}
+                      </div>
                     </div>
                   </div>
                 </div>
