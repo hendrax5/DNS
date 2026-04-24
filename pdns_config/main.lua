@@ -43,8 +43,8 @@ if enable_mmap then
     _G.reload_bloom()
 
     local function domainFNV1a(domain)
-        local hash = ffi.new("uint64_t", 0xcbf29ce484222325ULL)
-        local prime = ffi.new("uint64_t", 0x100000001b3ULL)
+        local hash = ffi.cast("uint64_t", "14695981039346656037")
+        local prime = ffi.cast("uint64_t", "1099511628211")
         
         for part in string.gmatch(domain, "[^%.]+") do
             hash = bit.bxor(hash, ffi.new("uint64_t", #part))
@@ -64,7 +64,7 @@ if enable_mmap then
         local h1 = domainFNV1a(domain)
         local h2 = domainFNV1a("salt_b" .. domain)
         
-        local mBits = ffi.new("uint64_t", 268435456ULL)
+        local mBits = ffi.cast("uint64_t", 268435456)
         local k = 9
         
         for i=0, k-1 do
