@@ -1,65 +1,89 @@
--- Lua PreResolve Hook for ACL Management
-acl = newNMG()
+-- DNSDist LUA FFI & Routing Engine
+local ffi = require("ffi")
+local bit = require("bit")
 
--- Open query log file safely (128KB VBUF for lock-free speed)
-math.randomseed(os.time())
-local logfile = io.open("/var/log/netshield/pdns-queries.log", "a")
-if logfile then logfile:setvbuf("full", 131072) end
+-- FFI C Declarations for MMAP
+ffi.cdef[[
+    int open(const char *pathname, int flags);
+    void *mmap(void *addr, size_t length, int prot, int flags, int fd, int64_t offset);
+    int close(int fd);
+    typedef uint32_t mode_t;
+]]
 
--- Load Allowed IPs from text file
-local acl_file = "/etc/powerdns/allowed_ips.txt"
-local f = io.open(acl_file, "r")
-if f then
-    for line in f:lines() do
-        if line:match("%S") and not line:match("^#") then
-            acl:addMask(line)
-        end
+local O_RDONLY = 0
+local PROT_READ = 1
+local MAP_SHARED = 1
+
+local bloom_ptr = nil
+local bloom_fd = -1
+local bloom_size = 33554432 -- 32MB
+
+-- Hot Swap Reload (RCU Pattern)
+function reload_bloom()
+    if bloom_fd ~= -1 then
+        ffi.C.close(bloom_fd)
     end
-    f:close()
+    bloom_fd = ffi.C.open("/etc/powerdns/bloom.bin", O_RDONLY)
+    if bloom_fd >= 0 then
+        bloom_ptr = ffi.C.mmap(nil, bloom_size, PROT_READ, MAP_SHARED, bloom_fd, 0)
+        bloom_ptr = ffi.cast("uint8_t *", bloom_ptr)
+    else
+        bloom_ptr = nil
+    end
 end
 
-function gettag(remote, ednsmask, localmac, qname, qtype, ednsoptions, tcp)
-    local action = "ALLOW"
-    local drop = false
+reload_bloom()
 
-    if not acl:match(remote) then
-        action = "DROP_ACL"
-        drop = true
-    end
-
-    if logfile then
-        local logIt = true
-        local isAnomaly = (qtype == 255 or qtype == 16) -- ANY, TXT
-        
-        -- Probabilistic Sampling: Log 1/20 of ALLOW traffic to prevent disk I/O DOS
-        if action == "ALLOW" and not isAnomaly then
-            if math.random(1, 100) > 5 then
-                logIt = false
-            end
-        end
-
-        if logIt then
-            logfile:write(string.format('{"time":%d, "ip":"%s", "qname":"%s", "type":%d, "action":"%s"}\n', os.time(), remote:toString(), qname:toString(), qtype, action))
+-- FNV-1a Hash (Identik dengan C/Go Implementation Generator)
+local function domainFNV1a(domain)
+    local hash = ffi.new("uint64_t", 0xcbf29ce484222325ULL)
+    local prime = ffi.new("uint64_t", 0x100000001b3ULL)
+    
+    for part in string.gmatch(domain, "[^%.]+") do
+        hash = bit.bxor(hash, ffi.new("uint64_t", #part))
+        hash = hash * prime
+        for i=1, #part do
+            local byte = string.byte(part, i)
+            if byte >= 65 and byte <= 90 then byte = byte + 32 end -- lowercase
+            hash = bit.bxor(hash, ffi.new("uint64_t", byte))
+            hash = hash * prime
         end
     end
-
-    if drop then
-        return 1
-    end
-    return 0
+    return hash
 end
 
-function preresolve(dq)
-    -- Enforce ACL Drop (Return REFUSED)
-    if not acl:match(dq.remoteaddr) then
-        dq.rcode = pdns.REFUSED
-        return true
-    end
-
-    if dq.appliedPolicy and dq.appliedPolicy.policyKind ~= pdns.policykinds.NoAction then
-        if logfile then
-            logfile:write(string.format('{"time":%d, "ip":"%s", "qname":"%s", "type":%d, "action":"DROP_RPZ"}\n', os.time(), dq.remoteaddr:toString(), dq.qname:toString(), dq.qtype))
+local function checkBloom(domain)
+    if bloom_ptr == nil then return false end
+    local h1 = domainFNV1a(domain)
+    local h2 = domainFNV1a("salt_b" .. domain)
+    
+    local mBits = ffi.new("uint64_t", 268435456ULL)
+    local k = 9
+    
+    for i=0, k-1 do
+        local idx = tonumber((h1 + ffi.new("uint64_t", i)*h2) % mBits)
+        local byteIdx = math.floor(idx / 8)
+        local bitIdx = idx % 8
+        local byteVal = bloom_ptr[byteIdx]
+        if bit.band(byteVal, bit.lshift(1, bitIdx)) == 0 then
+            return false
         end
     end
-    return false
+    return true
+end
+
+function bloom_router(dq)
+    local qname = dq.qname:toString()
+    qname = string.gsub(qname, "%.$", "")
+    
+    -- Telemetry & Anomaly Logging bypass code ...
+    
+    local is_dirty = checkBloom(qname)
+    if is_dirty then
+        -- Kirim ke PowerDNS Recursor (RPZ Engine)
+        return DNSAction.Pool, "POWERDNS"
+    end
+    
+    -- Kirim ke Unbound Resolver (Pure Fast Resolution)
+    return DNSAction.Pool, "UNBOUND"
 end

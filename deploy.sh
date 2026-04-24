@@ -24,6 +24,13 @@ do_install() {
         echo " ⚠️ PERINGATAN: File sysctl-dns-optimize.sh tidak ditemukan!"
     fi
 
+    echo "[1.5/3] Menerapkan Transparent HugePages (THP) Tuning untuk Bloom Filter mmap..."
+    if [ -w /sys/kernel/mm/transparent_hugepage/enabled ]; then
+        echo always > /sys/kernel/mm/transparent_hugepage/enabled || true
+        echo always > /sys/kernel/mm/transparent_hugepage/defrag || true
+        echo " ✅ THP berhasil diaktifkan."
+    fi
+
     # 2. Patch dnsdist.conf ke Multi-Threading (16 Listener Cores)
     echo "[2/3] Memperbarui Konfigurasi DNSDist (SO_REUSEPORT)..."
     DNSDIST_CONF="$DIR/pdns_config/dnsdist.conf"

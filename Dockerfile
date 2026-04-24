@@ -23,7 +23,7 @@ RUN clang -O2 -target bpf -c dns_filter.c -o dns_filter.o && \
 
 # Final Stage: PowerDNS + Supervisord + XDP + GoBGP
 FROM alpine:latest
-RUN apk add --no-cache supervisor dnsdist pdns-recursor lua sqlite tzdata bind-tools numactl curl \
+RUN apk add --no-cache supervisor dnsdist unbound pdns-recursor lua sqlite tzdata bind-tools numactl curl \
     iproute2 bpftool && \
     curl -sL https://github.com/osrg/gobgp/releases/download/v3.31.0/gobgp_3.31.0_linux_amd64.tar.gz -o gobgp.tar.gz && \
     tar -xzf gobgp.tar.gz && \
@@ -50,9 +50,10 @@ COPY supervisord.conf /etc/supervisord.conf
 COPY pdns_config/ /etc/powerdns/
 
 # Setup directories
-RUN mkdir -p /var/run/pdns-recursor /var/log/supervisor /data /etc/powerdns/tls /sys/fs/bpf && \
-    chown recursor:recursor /var/run/pdns-recursor && \
-    touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua /etc/powerdns/rpz_feeds.txt /etc/powerdns/allowed_ips.txt /etc/powerdns/rpz_compiled.zone /etc/powerdns/custom_blacklist.zone /etc/powerdns/custom_whitelist.zone
+RUN mkdir -p /var/run/pdns-recursor /var/run/unbound /var/log/supervisor /data /etc/powerdns/tls /sys/fs/bpf && \
+    mkdir -p /etc/unbound && \
+    touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua /etc/powerdns/rpz_feeds.txt /etc/powerdns/allowed_ips.txt /etc/powerdns/rpz_compiled.zone /etc/powerdns/custom_blacklist.zone /etc/powerdns/custom_whitelist.zone && \
+    chown recursor:recursor /var/run/pdns-recursor && chown unbound:unbound /etc/unbound /var/run/unbound
 
 # Expose ports (DNS, HTTP Dashboard, DoT, DoH)
 EXPOSE 53/udp 53/tcp 80/tcp 853/tcp 443/tcp

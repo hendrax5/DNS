@@ -1338,6 +1338,9 @@ func syncRPZWorker() {
 			log.Println(msg)
 			addWorkerLog("RPZ WORKER", msg)
 
+			// Generate the mmap Bloom Filter for DNSDist
+			go generateBloomFilter(finalDomains)
+
 			// Write Whitelist explicit rules at bottom to guarantee parsing validity
 			for d := range wlMap {
 				compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME rpz-passthru.", d))
