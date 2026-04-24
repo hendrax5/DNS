@@ -285,6 +285,7 @@ func main() {
 	admin.Post("/sys-update/pull", PullSysUpdate)
 	admin.Get("/sys-update/status", GetSysUpdateStatus)
 	admin.Get("/sys-update/log", GetSysUpdateLog)
+	admin.Get("/sys/axfr-log", GetAXFRLog)
 
 	admin.Get("/xdp/stats", GetXDPStatsAPI)
 	admin.Post("/xdp/toggle", ToggleXDP)
@@ -1756,6 +1757,15 @@ func GetSysUpdateLog(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"log": "Tidak ada riwayat log OTA yang tersedia."})
 	}
 	return c.JSON(fiber.Map{"log": string(data)})
+}
+
+func GetAXFRLog(c *fiber.Ctx) error {
+	cmd := exec.Command("sh", "-c", "grep -iE 'xfr|subsystem=\"rpz\"' /var/log/supervisor/pdns-err.log | tail -n 250")
+	out, err := cmd.CombinedOutput()
+	if err != nil || len(out) == 0 {
+		out = []byte("Menunggu proses sinkronisasi zona (AXFR/RPZ)... Log koneksi belum tersedia.")
+	}
+	return c.JSON(fiber.Map{"log": string(out)})
 }
 
 func GetCustomLists(c *fiber.Ctx) error {

@@ -22,7 +22,11 @@ import {
   Trash2,
   ShieldBan,
   Users,
-  Edit
+  Edit,
+  FolderLock,
+  CloudCog,
+  MonitorCheck,
+  Terminal
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import Zones from './pages/Zones';
@@ -117,6 +121,7 @@ function App() {
   const [selectedBranch, setSelectedBranch] = useState('main');
   const [updateProgress, setUpdateProgress] = useState(null);
   const [otaLogText, setOtaLogText] = useState('');
+  const [axfrLogText, setAxfrLogText] = useState('');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -150,6 +155,14 @@ function App() {
       const res = await apiFetch('/api/sys-update/log');
       const data = await res.json();
       setOtaLogText(data.log || '');
+    } catch(e){}
+  };
+
+  const fetchAxfrLog = async () => {
+    try {
+      const res = await apiFetch('/api/sys/axfr-log');
+      const data = await res.json();
+      setAxfrLogText(data.log || '');
     } catch(e){}
   };
 
@@ -953,7 +966,14 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between items-center">
+                      <button 
+                        onClick={fetchAxfrLog}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2 border border-slate-700"
+                      >
+                        <Terminal className="w-4 h-4" />
+                        Cek Log Sinkronisasi
+                      </button>
                       <button 
                         onClick={saveAXFR}
                         className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
@@ -961,6 +981,19 @@ function App() {
                         Deploy AXFR Rules
                       </button>
                     </div>
+                    {axfrLogText && (
+                      <div className="p-4 bg-[#0a0a0a] border-t border-slate-800">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">AXFR Network Logs</span>
+                          <button onClick={() => setAxfrLogText('')} className="text-xs text-rose-400 hover:text-rose-300">Tutup Log</button>
+                        </div>
+                        <div className="bg-black rounded border border-slate-800 p-3 h-48 overflow-y-auto">
+                           <pre className="text-[10px] sm:text-xs font-mono text-emerald-400 whitespace-pre-wrap break-all">
+                             {axfrLogText}
+                           </pre>
+                        </div>
+                      </div>
+                    )}
                   </div>
               <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-slate-800">
