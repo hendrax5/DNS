@@ -42,7 +42,7 @@ func generateBloomFilter(domains map[string]struct{}) {
 	}
 	
 	// Instruct DNSDist to re-map the new file
-	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "reload_bloom()").Run()
+	exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "reload_bloom()").Run()
 	
 	log.Printf("[Bloom Sync] Generated 32MB Bloom Filter for %d domains.\n", len(domains))
 }

@@ -1075,6 +1075,13 @@ function App() {
                               <Terminal className="w-3.5 h-3.5" />
                               Lihat Log
                             </button>
+                            <button onClick={async () => {
+                                await ApiService.delete('/sys/intel-log');
+                                setIntelLogText('Menunggu log aktivitas Threat Intelligence...\nLog saat ini kosong atau belum ada kejadian.');
+                            }} className="w-full sm:w-auto px-4 py-2.5 bg-slate-800/80 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 text-xs font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex justify-center items-center gap-2 border border-slate-700 hover:border-rose-900/50">
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Bersihkan
+                            </button>
                             <button onClick={() => { saveAXFR(); saveRPZ(); }} className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-lg shadow-[0_0_15px_rgba(225,29,72,0.3)] transition-all duration-200 cursor-pointer flex justify-center items-center gap-2 whitespace-nowrap">
                               Deploy Threat Intel
                             </button>

@@ -156,6 +156,82 @@ func addWorkerLog(worker string, msg string) {
 	}
 }
 
+type TopAnalyticItem struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type DigHealth struct {
+	Domain  string `json:"domain"`
+	Status  string `json:"status"`
+	Latency int    `json:"latency"`
+	Ping    int    `json:"ping"`
+}
+
+var (
+	globalTopClients   []TopAnalyticItem
+	globalTopAllowed   []TopAnalyticItem
+	globalTopBlocked   []TopAnalyticItem
+	digHealth          []DigHealth
+)
+
+func parsePDNSTopOutput(out string) []TopAnalyticItem {
+	var items []TopAnalyticItem
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "%") && !strings.Contains(line, "rest") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				name := strings.Split(parts[1], "|")[0]
+				pctStr := strings.TrimRight(parts[0], "%")
+				pct, _ := strconv.ParseFloat(pctStr, 64)
+				countObj := int(pct)
+				if countObj == 0 {
+					countObj = 1
+				}
+				items = append(items, TopAnalyticItem{Name: name, Count: countObj * 10})
+			}
+		}
+	}
+	return items
+}
+
+func advancedMonitoringWorker() {
+	checkNodes := []string{"1.1.1.1", "8.8.8.8", "9.9.9.9"}
+	for {
+		outC, _ := exec.Command("rec_control", "top-remotes").Output()
+		tc := parsePDNSTopOutput(string(outC))
+		
+		outQ, _ := exec.Command("rec_control", "top-queries").Output()
+		ta := parsePDNSTopOutput(string(outQ))
+		
+		var dh []DigHealth
+		for _, node := range checkNodes {
+			start := time.Now()
+			err := exec.Command("ping", "-c", "1", "-W", "1", "-q", node).Run()
+			latency := int(time.Since(start).Milliseconds())
+			status := "OK"
+			if err != nil {
+				status = "ERR"
+			}
+			dh = append(dh, DigHealth{
+				Domain:  node,
+				Status:  status,
+				Latency: latency,
+				Ping:    latency,
+			})
+		}
+		
+		metricsMutex.Lock()
+		globalTopClients = tc
+		globalTopAllowed = ta
+		digHealth = dh
+		metricsMutex.Unlock()
+		
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func main() {
 	initDB()
 	writeCustomRPZ()
@@ -163,6 +239,7 @@ func main() {
 	// Mulai background workers
 	go syncRPZWorker()
 	go streamLogs()
+	go advancedMonitoringWorker()
 	go systemTelemetryWorker()
 	go liveQPSWorker()
 	go prefetchWorker()
@@ -286,6 +363,7 @@ func main() {
 	admin.Get("/sys-update/status", GetSysUpdateStatus)
 	admin.Get("/sys-update/log", GetSysUpdateLog)
 	admin.Get("/sys/intel-log", GetIntelLog)
+	admin.Delete("/sys/intel-log", ClearIntelLog)
 
 	admin.Get("/xdp/stats", GetXDPStatsAPI)
 	admin.Post("/xdp/toggle", ToggleXDP)
@@ -400,7 +478,7 @@ func generateACLConfig() {
 	}
 	exec.Command("rec_control", "reload-lua-script").Run()
 	exec.Command("rec_control", "wipe-cache", "$").Run()
-	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
+	exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"UNBOUND\"):getCache():expunge(0)").Run()
 }
 
 func generateForwardersConfig() {
@@ -524,7 +602,7 @@ yandex.com CNAME yandex.com.
 	// Hot reload PowerDNS settings without rebooting the container
 	exec.Command("rec_control", "reload-lua-config").Run()
 	exec.Command("rec_control", "wipe-cache", "$").Run()
-	exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
+	exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
 }
 
 func LoginHandler(c *fiber.Ctx) error {
@@ -786,6 +864,10 @@ func GetPDNSStats(c *fiber.Ctx) error {
 		}
 	}
 
+	var topA_clients []TopAnalyticItem
+	var topA_allowed []TopAnalyticItem
+	var dh []DigHealth
+
 	metricsMutex.RLock()
 	hist := make([]TimeSeriesPoint, len(historySeries))
 	copy(hist, historySeries)
@@ -793,6 +875,15 @@ func GetPDNSStats(c *fiber.Ctx) error {
 	for k, v := range queryTypeMap { qMap[k] = v }
 	alrts := make([]TelemetryAlert, len(telemetryAlerts))
 	copy(alrts, telemetryAlerts)
+	
+	// Copy topAnalytics to prevent race conditions during serialization
+	topA_clients = make([]TopAnalyticItem, len(globalTopClients))
+	copy(topA_clients, globalTopClients)
+	topA_allowed = make([]TopAnalyticItem, len(globalTopAllowed))
+	copy(topA_allowed, globalTopAllowed)
+	dh = make([]DigHealth, len(digHealth))
+	copy(dh, digHealth)
+	
 	metricsMutex.RUnlock()
 
 	workerLogsMutex.RLock()
@@ -817,6 +908,12 @@ func GetPDNSStats(c *fiber.Ctx) error {
 			"NXDOMAIN": nx,
 			"SERVFAIL": servfail,
 		},
+		"topAnalytics": fiber.Map{
+			"clients": topA_clients,
+			"allowed": topA_allowed,
+			"blocked": []TopAnalyticItem{}, // Optional mock or leave empty for NXDOMAIN blocked features
+		},
+		"digHealth": dh,
 	})
 }
 
@@ -1163,8 +1260,8 @@ func syncRPZWorker() {
 		interval = res
 	}
 
-	// Jangan fetch ulang setiap restart jika cache masih segar (berdasarkan ModTime)
-	if stat, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); err == nil {
+	// Jangan fetch ulang setiap restart jika cache masih segar (berdasarkan ModTime dan Size)
+	if stat, err := os.Stat("/etc/powerdns/rpz_compiled.zone"); err == nil && stat.Size() > 200 {
 		timePassed := time.Since(stat.ModTime())
 		timeRequired := time.Duration(interval) * time.Minute
 		if timePassed < timeRequired {
@@ -1354,7 +1451,7 @@ func syncRPZWorker() {
 				// Signal PowerDNS to instantly reload latest compiled policies
 				exec.Command("rec_control", "reload-lua-config").Run()
 				exec.Command("rec_control", "wipe-cache", "$").Run()
-				exec.Command("dnsdist", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"backend\"):getCache():expunge(0)").Run()
+				exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"UNBOUND\"):getCache():expunge(0)").Run()
 
 				// Sinkronisasi ke XDP BPF Map (jika XDP aktif)
 				// Domain terblokir akan di-DROP di level NIC!
@@ -1778,6 +1875,11 @@ func GetIntelLog(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"log": string(out)})
 }
 
+func ClearIntelLog(c *fiber.Ctx) error {
+	exec.Command("sh", "-c", "truncate -s 0 /var/log/supervisor/pdns-err.log /var/log/supervisor/supervisord.log").Run()
+	return c.JSON(fiber.Map{"status": "success", "message": "Logs cleared"})
+}
+
 func GetCustomLists(c *fiber.Ctx) error {
 	var bl, wl string
 	db.QueryRow("SELECT value FROM settings WHERE key = 'custom_blacklist'").Scan(&bl)
@@ -1913,7 +2015,7 @@ func liveQPSWorker() {
 	ticker := time.NewTicker(2 * time.Second)
 	var lastCount float64
 	for range ticker.C {
-		out, err := exec.Command("dnsdist", "-c", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "dumpStats()").Output()
+		out, err := exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "dumpStats()").Output()
 		if err == nil {
 			lines := strings.Split(string(out), "\n")
 			var queries float64
