@@ -68,11 +68,20 @@ do_upgrade() {
     echo ">>> MEMULAI UPGRADE (GIT PULL & REDEPLOY)"
     echo "-----------------------------------------------------------"
     cd "$DIR" || exit
-    echo "[1/2] Menarik pembaruan dari repositori (git pull)..."
-    git pull origin main
+    
+    # Deteksi branch saat ini (misal dev atau main)
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    echo "[!] OTA mendeteksi branch aktif: $CURRENT_BRANCH"
+    
+    echo "[1/2] Menarik pembaruan dari repositori (git pull origin $CURRENT_BRANCH)..."
+    git pull origin "$CURRENT_BRANCH"
     echo " ✅ Repositori diperbarui."
+    echo " 📜 Log Update:"
+    git log -1 --oneline
     echo ""
-    do_docker_rebuild
+    
+    # Menjalankan rebuild dan merekam output ke file log
+    do_docker_rebuild 2>&1 | tee "$DIR/data/ota_update.log"
 }
 
 do_docker_rebuild() {
