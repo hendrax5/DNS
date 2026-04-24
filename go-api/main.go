@@ -285,7 +285,7 @@ func main() {
 	admin.Post("/sys-update/pull", PullSysUpdate)
 	admin.Get("/sys-update/status", GetSysUpdateStatus)
 	admin.Get("/sys-update/log", GetSysUpdateLog)
-	admin.Get("/sys/axfr-log", GetAXFRLog)
+	admin.Get("/sys/intel-log", GetIntelLog)
 
 	admin.Get("/xdp/stats", GetXDPStatsAPI)
 	admin.Post("/xdp/toggle", ToggleXDP)
@@ -1759,11 +1759,21 @@ func GetSysUpdateLog(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"log": string(data)})
 }
 
-func GetAXFRLog(c *fiber.Ctx) error {
-	cmd := exec.Command("sh", "-c", "grep -iE 'xfr|subsystem=\"rpz\"' /var/log/supervisor/pdns-err.log | tail -n 250")
+func GetIntelLog(c *fiber.Ctx) error {
+	filterType := c.Query("type", "both")
+	var grepPattern string
+	if filterType == "axfr" {
+		grepPattern = "xfr|subsystem=\"rpz\""
+	} else if filterType == "rpz" {
+		grepPattern = "\\[RPZ Worker\\]|\\[API\\] RPZ"
+	} else {
+		grepPattern = "xfr|subsystem=\"rpz\"|\\[RPZ Worker\\]|\\[API\\] RPZ"
+	}
+
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("grep -iE '%s' /var/log/supervisor/pdns-err.log /var/log/supervisor/supervisord.log 2>/dev/null | tail -n 250", grepPattern))
 	out, err := cmd.CombinedOutput()
 	if err != nil || len(out) == 0 {
-		out = []byte("Menunggu proses sinkronisasi zona (AXFR/RPZ)... Log koneksi belum tersedia.")
+		out = []byte("Menunggu log aktivitas Threat Intelligence...\nLog saat ini kosong atau belum ada kejadian.")
 	}
 	return c.JSON(fiber.Map{"log": string(out)})
 }

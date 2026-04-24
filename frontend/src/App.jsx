@@ -26,7 +26,8 @@ import {
   FolderLock,
   CloudCog,
   MonitorCheck,
-  Terminal
+  Terminal,
+  CloudDownload
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import Zones from './pages/Zones';
@@ -121,7 +122,9 @@ function App() {
   const [selectedBranch, setSelectedBranch] = useState('main');
   const [updateProgress, setUpdateProgress] = useState(null);
   const [otaLogText, setOtaLogText] = useState('');
-  const [axfrLogText, setAxfrLogText] = useState('');
+  const [intelLogText, setIntelLogText] = useState('');
+  const [intelLogFilter, setIntelLogFilter] = useState('both');
+  const [activeIntelTab, setActiveIntelTab] = useState('axfr');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -158,11 +161,11 @@ function App() {
     } catch(e){}
   };
 
-  const fetchAxfrLog = async () => {
+  const fetchIntelLog = async () => {
     try {
-      const res = await apiFetch('/api/sys/axfr-log');
+      const res = await apiFetch(`/api/sys/intel-log?type=${intelLogFilter}`);
       const data = await res.json();
-      setAxfrLogText(data.log || '');
+      setIntelLogText(data.log || '');
     } catch(e){}
   };
 
@@ -898,23 +901,59 @@ function App() {
                 </div>
               </div>
 
-                  {/* AXFR Native Zone Config */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                    <div className="p-6 border-b border-slate-800">
-                      <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                        <DatabaseIcon className="w-5 h-5 text-indigo-400" />
-                        AXFR/IXFR DNS Master
-                      </h2>
-                      <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                        Protokol Zone Transfer Asli yang terhubung langsung ke Server Pusat BSSN/Kominfo (melewati HTTP).
-                      </p>
+                  {/* UNIFIED THREAT INTELLIGENCE BOARD */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-2">
+                    <div className="p-6 border-b border-slate-800 flex justify-between items-start">
+                      <div>
+                        <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
+                          <ShieldAlert className="w-5 h-5 text-rose-500" />
+                          Pusat Intelegensi Ancaman (Threat Feeds)
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-2 leading-relaxed max-w-3xl">
+                          Sistem perlindungan DNS menggunakan transfer HTTP RPZ dan protokol transfer murni (AXFR/IXFR) ke Server Pusat.
+                        </p>
+                      </div>
                     </div>
                     
                     <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                      <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
-                        {rpzAXFR.map((feed, i) => (
-                          <div key={i} className="flex flex-col gap-2 bg-[#0b1120] p-4 rounded-lg border border-slate-800/80 shadow-inner">
-                            <div className="flex items-center gap-3">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <div className="flex bg-[#0b1120] p-1 rounded-xl border border-slate-800/80 shadow-inner">
+                           <button 
+                              onClick={() => setActiveIntelTab('axfr')} 
+                              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-2 ${activeIntelTab === 'axfr' ? 'bg-indigo-600/90 text-white shadow-lg backdrop-blur-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                           >
+                              <DatabaseIcon className="w-3.5 h-3.5" />
+                              AXFR Protocol
+                           </button>
+                           <button 
+                              onClick={() => setActiveIntelTab('http')} 
+                              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-2 ${activeIntelTab === 'http' ? 'bg-emerald-600/90 text-white shadow-lg backdrop-blur-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                           >
+                              <CloudDownload className="w-3.5 h-3.5" />
+                              HTTP Sync Feed
+                           </button>
+                        </div>
+                        <div className="flex gap-2">
+                           {activeIntelTab === 'axfr' ? (
+                             <button onClick={() => setRpzAXFR([...rpzAXFR, {master_ip: '', zone_name: '', enabled: false}])} className="text-xs bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-4 py-2 rounded-xl border border-indigo-500/30 transition-colors flex items-center gap-1.5 font-semibold hover:-translate-y-0.5 duration-300">+ Tambah AXFR</button>
+                           ) : (
+                             <button onClick={() => setRpzFeeds([...rpzFeeds, {url: '', enabled: true}])} className="text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-xl border border-emerald-500/30 transition-colors flex items-center gap-1.5 font-semibold hover:-translate-y-0.5 duration-300">+ Tambah HTTP</button>
+                           )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2 min-h-[200px]">
+                        {/* AXFR List Render */}
+                        {activeIntelTab === 'axfr' && (rpzAXFR.length === 0 ? (
+                           <div className="flex flex-col items-center justify-center p-8 bg-[#0b1120] rounded-xl border border-dashed border-indigo-900/50 text-indigo-400/60">
+                             <DatabaseIcon className="w-8 h-8 mb-2 opacity-50" />
+                             <span className="text-sm font-semibold">Tidak ada Master AXFR</span>
+                             <span className="text-xs mt-1">Tambahkan server pusat BSSN/Kominfo Anda</span>
+                           </div>
+                        ) : rpzAXFR.map((feed, i) => (
+                          <div key={`axfr-${i}`} className="flex flex-col sm:flex-row items-center gap-3 bg-[#0b1120] p-4 rounded-xl border border-indigo-500/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)] flex-wrap relative group hover:border-indigo-500/40 transition-colors">
+                             <div className="absolute -top-2.5 left-4 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow flex items-center gap-1"><DatabaseIcon className="w-2.5 h-2.5"/> AXFR</div>
+                             <div className="flex flex-1 items-center gap-3 w-full mt-2 sm:mt-0">
                                <input
                                   type="text"
                                   value={feed.master_ip}
@@ -923,8 +962,8 @@ function App() {
                                       next[i].master_ip = e.target.value;
                                       setRpzAXFR(next);
                                   }}
-                                  className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
-                                  placeholder="IP Master (e.g. 182.23.79.202)"
+                                  className="w-[150px] bg-transparent border-b border-slate-700 pb-1.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-400 transition-colors placeholder:text-slate-600"
+                                  placeholder="IP Master Server"
                                />
                                <input
                                   type="text"
@@ -934,165 +973,128 @@ function App() {
                                       next[i].zone_name = e.target.value;
                                       setRpzAXFR(next);
                                   }}
-                                  className="w-1/2 bg-transparent border-b border-slate-800 pb-1 text-sm font-mono text-slate-300 focus:outline-none focus:border-indigo-500 placeholder:text-slate-700"
-                                  placeholder="Zone (e.g. trustpositifkominfo)"
+                                  className="flex-1 min-w-[120px] bg-transparent border-b border-slate-700 pb-1.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-400 transition-colors placeholder:text-slate-600"
+                                  placeholder="Nama Zona (Misal trustpositif)"
                                />
-                            </div>
-                            <div className="flex justify-between items-center mt-2">
+                             </div>
+                             
+                             <div className="flex-none flex justify-end items-center gap-3 w-full sm:w-auto">
                                <button
                                   onClick={() => {
                                       const next = [...rpzAXFR];
                                       next[i].enabled = !next[i].enabled;
                                       setRpzAXFR(next);
                                   }}
-                                  className={`px-3 py-1 rounded text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-[0_0_10px_rgba(79,70,229,0.15)]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
+                                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(79,70,229,0.2)]' : 'bg-slate-800 text-slate-500 border border-slate-700 hover:bg-slate-700'}`}
                                >
-                                  {feed.enabled ? 'PROTOCOL ENABLED' : 'DISABLED'}
-                               </button>
-                               <button
-                                  onClick={() => setRpzAXFR(rpzAXFR.filter((_, idx) => idx !== i))}
-                                  className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer text-xs"
-                               >
-                                  ✕ Buang
-                               </button>
-                            </div>
+                                  {feed.enabled ? 'ENABLED' : 'DISABLED'}
+                                </button>
+                               <button onClick={() => setRpzAXFR(rpzAXFR.filter((_, idx) => idx !== i))} className="text-slate-600 hover:text-red-400 transition-colors cursor-pointer w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-500/10">✕</button>
+                             </div>
                           </div>
-                        ))}
-                        <button
-                            onClick={() => setRpzAXFR([...rpzAXFR, {master_ip: '', zone_name: '', enabled: false}])}
-                            className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 flex items-center justify-center py-2.5 border border-dashed border-indigo-900/50 rounded-lg cursor-pointer transition-colors bg-indigo-950/10 hover:bg-indigo-950/30"
-                        >
-                            + Tambah Master AXFR Server
-                        </button>
+                        )))}
+
+                        {/* RPZ List Render */}
+                        {activeIntelTab === 'http' && (rpzFeeds.length === 0 ? (
+                           <div className="flex flex-col items-center justify-center p-8 bg-[#0b1120] rounded-xl border border-dashed border-emerald-900/50 text-emerald-400/60">
+                             <CloudDownload className="w-8 h-8 mb-2 opacity-50" />
+                             <span className="text-sm font-semibold">Tidak ada HTTP Feed</span>
+                             <span className="text-xs mt-1">Tambahkan URL List untuk di-sync otomatis</span>
+                           </div>
+                        ) : rpzFeeds.map((feed, i) => {
+                          const syncData = stats?.rpz_status?.find(s => s.url === feed.url);
+                          const isError = syncData && syncData.status !== "Synced & Parsed" && syncData.status !== "Disabled" && syncData.status !== "Mock";
+                          return (
+                          <div key={`rpz-${i}`} className="flex flex-col sm:flex-row items-center gap-3 bg-[#0b1120] p-4 rounded-xl border border-emerald-500/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)] flex-wrap relative group hover:border-emerald-500/40 transition-colors">
+                            <div className="absolute -top-2.5 left-4 bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow flex items-center gap-1"><CloudDownload className="w-2.5 h-2.5"/> HTTP</div>
+                            <div className="flex flex-1 items-center gap-3 w-full mt-2 sm:mt-0">
+                               <input
+                                  type="text"
+                                  value={feed.url}
+                                  onChange={e => {
+                                      const next = [...rpzFeeds];
+                                      next[i].url = e.target.value;
+                                      setRpzFeeds(next);
+                                  }}
+                                  className="flex-1 min-w-[200px] bg-transparent border-b border-slate-700 pb-1.5 text-sm font-mono text-slate-200 focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-slate-600"
+                                  placeholder="Target URL Berkas Blokir (.txt / .rpz)"
+                               />
+                            </div>
+                            {syncData && (
+                              <div className="flex-none px-2 flex items-center gap-1.5 w-full sm:w-auto">
+                                {isError ? (
+                                  <span className="text-xs bg-red-500/10 text-red-400 font-semibold px-2 py-1 rounded flex items-center gap-1 shadow-sm border border-red-500/20" title={syncData.error}>⚠️ {syncData.status}</span>
+                                ) : syncData.status === "Synced & Parsed" ? (
+                                  <span className="text-xs bg-emerald-500/10 text-emerald-400 font-bold px-2.5 py-1 rounded flex items-center gap-1 shadow-sm border border-emerald-500/20">
+                                    <CheckCircle2 className="w-3 h-3" /> {syncData.records.toLocaleString()} Baris
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-500 font-semibold px-2 py-1">{syncData.status}</span>
+                                )}
+                              </div>
+                            )}
+                            <div className="flex-none flex justify-end items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                               <button
+                                  onClick={() => {
+                                      const next = [...rpzFeeds];
+                                      next[i].enabled = !next[i].enabled;
+                                      setRpzFeeds(next);
+                                  }}
+                                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-slate-800 text-slate-500 border border-slate-700 hover:bg-slate-700'}`}
+                               >
+                                  {feed.enabled ? 'ENABLED' : 'DISABLED'}
+                               </button>
+                               <button onClick={() => setRpzFeeds(rpzFeeds.filter((_, idx) => idx !== i))} className="text-slate-600 hover:text-red-400 transition-colors cursor-pointer w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-500/10">✕</button>
+                            </div>
+                            {isError && syncData.error && (
+                              <div className="w-full mt-1 text-[10px] text-red-400/80 font-mono tracking-wide px-1 truncate bg-red-950/20 p-1.5 rounded border border-red-900/30">
+                                {syncData.error}
+                              </div>
+                            )}
+                          </div>
+                        )}))}
+                      </div>
+
+                      <div className="mt-6 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                         <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400 font-bold tracking-widest uppercase whitespace-nowrap">HTTP Interval (Menit)</span>
+                            <input 
+                               type="number" 
+                               value={syncInterval} 
+                               onChange={e => setSyncInterval(parseInt(e.target.value) || 1)}
+                               className="w-20 bg-[#0b1120] border border-slate-700/50 rounded px-2 py-1.5 text-center text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                            />
+                         </div>
+                         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                            <select value={intelLogFilter} onChange={e => {setIntelLogFilter(e.target.value); setIntelLogText('');}} className="w-full sm:w-auto bg-slate-800 text-xs text-slate-300 px-3 py-2.5 rounded-lg border border-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer">
+                               <option value="both">Log: Semua Sumbu</option>
+                               <option value="axfr">Log: Khusus Master AXFR</option>
+                               <option value="rpz">Log: Khusus HTTP Sync</option>
+                            </select>
+                            <button onClick={fetchIntelLog} className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex justify-center items-center gap-2 border border-slate-700">
+                              <Terminal className="w-3.5 h-3.5" />
+                              Lihat Log
+                            </button>
+                            <button onClick={() => { saveAXFR(); saveRPZ(); }} className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-lg shadow-[0_0_15px_rgba(225,29,72,0.3)] transition-all duration-200 cursor-pointer flex justify-center items-center gap-2 whitespace-nowrap">
+                              Deploy Threat Intel
+                            </button>
+                         </div>
                       </div>
                     </div>
-                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-between items-center">
-                      <button 
-                        onClick={fetchAxfrLog}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2 border border-slate-700"
-                      >
-                        <Terminal className="w-4 h-4" />
-                        Cek Log Sinkronisasi
-                      </button>
-                      <button 
-                        onClick={saveAXFR}
-                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
-                      >
-                        Deploy AXFR Rules
-                      </button>
-                    </div>
-                    {axfrLogText && (
+                    {intelLogText && (
                       <div className="p-4 bg-[#0a0a0a] border-t border-slate-800">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">AXFR Network Logs</span>
-                          <button onClick={() => setAxfrLogText('')} className="text-xs text-rose-400 hover:text-rose-300">Tutup Log</button>
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Intel Synchronization Logs ({intelLogFilter.toUpperCase()})</span>
+                          <button onClick={() => setIntelLogText('')} className="text-xs text-rose-400 hover:text-rose-300">Tutup Log</button>
                         </div>
                         <div className="bg-black rounded border border-slate-800 p-3 h-48 overflow-y-auto">
                            <pre className="text-[10px] sm:text-xs font-mono text-emerald-400 whitespace-pre-wrap break-all">
-                             {axfrLogText}
+                             {intelLogText}
                            </pre>
                         </div>
                       </div>
                     )}
                   </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
-                <div className="p-6 border-b border-slate-800">
-                  <h2 className="text-lg font-semibold flex items-center gap-2 text-white">
-                    <ShieldAlert className="w-5 h-5 text-slate-400" />
-                    Bahan Baku DNS (Feeds)
-                  </h2>
-                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                    Masukkan URL untuk mengunduh arsip zona RPZ (misal. Kominfo Trust Positif) atau daftar blokir khusus format blok.
-                  </p>
-                </div>
-                
-                <div className="p-6 bg-slate-950/50 flex flex-col flex-1">
-                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2">
-                    {rpzFeeds.map((feed, i) => {
-                      const syncData = stats?.rpz_status?.find(s => s.url === feed.url);
-                      const isError = syncData && syncData.status !== "Synced & Parsed" && syncData.status !== "Disabled" && syncData.status !== "Mock";
-                      return (
-                      <div key={i} className="flex items-center gap-3 bg-[#0b1120] p-3 rounded-lg border border-slate-800/80 shadow-inner flex-wrap">
-                        <input
-                           type="text"
-                           value={feed.url}
-                           onChange={e => {
-                               const next = [...rpzFeeds];
-                               next[i].url = e.target.value;
-                               setRpzFeeds(next);
-                           }}
-                           className="flex-1 min-w-[200px] bg-transparent text-sm font-mono text-slate-300 focus:outline-none placeholder:text-slate-700"
-                           placeholder="https://..."
-                        />
-                        {syncData && (
-                          <div className="flex-none px-2 flex items-center gap-1.5">
-                            {isError ? (
-                              <span className="text-xs bg-red-500/10 text-red-400 font-semibold px-2 py-1 rounded flex items-center gap-1 shadow-sm border border-red-500/20" title={syncData.error}>
-                                ⚠️ {syncData.status}
-                              </span>
-                            ) : syncData.status === "Synced & Parsed" ? (
-                              <span className="text-xs bg-emerald-500/10 text-emerald-400 font-semibold px-2 py-1 rounded flex items-center gap-1 shadow-sm border border-emerald-500/20">
-                                <CheckCircle2 className="w-3 h-3" /> {syncData.records.toLocaleString()} Baris
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-500 font-semibold px-2 py-1">{syncData.status}</span>
-                            )}
-                          </div>
-                        )}
-                        <button
-                           onClick={() => {
-                               const next = [...rpzFeeds];
-                               next[i].enabled = !next[i].enabled;
-                               setRpzFeeds(next);
-                           }}
-                           className={`px-3 py-1 rounded text-xs font-bold transition-all whitespace-nowrap ${feed.enabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.15)]' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
-                        >
-                           {feed.enabled ? 'ENABLED' : 'DISABLED'}
-                        </button>
-                        <button
-                           onClick={() => setRpzFeeds(rpzFeeds.filter((_, idx) => idx !== i))}
-                           className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer p-1"
-                        >
-                           ✕
-                        </button>
-                        {isError && syncData.error && (
-                          <div className="w-full mt-1 text-[10px] text-red-400/80 font-mono tracking-wide px-1 truncate">
-                            {syncData.error}
-                          </div>
-                        )}
-                      </div>
-                    )})}
-                    <button
-                        onClick={() => setRpzFeeds([...rpzFeeds, {url: '', enabled: true}])}
-                        className="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center justify-center py-2.5 border border-dashed border-blue-900/50 rounded-lg cursor-pointer transition-colors bg-blue-950/10 hover:bg-blue-950/30"
-                    >
-                        + Tambah URL Baru
-                    </button>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
-                     <span className="text-xs text-slate-400 font-bold tracking-widest uppercase">Sinkronisasi Otomatis Interval</span>
-                     <div className="flex items-center gap-2">
-                        <input 
-                           type="number" 
-                           value={syncInterval} 
-                           onChange={e => setSyncInterval(parseInt(e.target.value) || 1)}
-                           className="w-16 bg-[#0b1120] border border-slate-700/50 rounded px-2 py-1.5 text-center text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                           min="1"
-                        />
-                        <span className="text-xs text-slate-500 font-medium">Menit</span>
-                     </div>
-                  </div>
-                </div>
-                <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
-                  <button 
-                    onClick={saveRPZ}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors duration-200 cursor-pointer flex items-center gap-2"
-                  >
-                    Simpan & Tarik Data
-                  </button>
-                </div>
-              </div>
 
               {/* RPZ Database Search Engine */}
               <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden lg:col-span-3">
