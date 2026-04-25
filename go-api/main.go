@@ -1924,6 +1924,7 @@ func writeCustomRPZ() {
 	blData := head
 	for _, x := range strings.Split(bl, "\n") {
 		x = strings.TrimSpace(x)
+		x = strings.TrimPrefix(x, "*.")
 		if x != "" {
 			blData += x + " IN CNAME .\n*." + x + " IN CNAME .\n"
 		}
@@ -1933,6 +1934,7 @@ func writeCustomRPZ() {
 	wlData := head
 	for _, x := range strings.Split(wl, "\n") {
 		x = strings.TrimSpace(x)
+		x = strings.TrimPrefix(x, "*.")
 		if x != "" {
 			wlData += x + " IN CNAME rpz-passthru.\n*." + x + " IN CNAME rpz-passthru.\n"
 		}
