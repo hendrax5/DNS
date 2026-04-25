@@ -559,6 +559,12 @@ func generateLuaConfig() {
 	}
 
 	luaContent := `rpzFile("/etc/powerdns/rpz_compiled.zone")` + "\n"
+	luaContent += `rpzFile("/etc/powerdns/custom_whitelist.zone", {defpol=Policy.Passthru})` + "\n"
+	if lamanLabuhIP != "" {
+		luaContent += fmt.Sprintf(`rpzFile("/etc/powerdns/custom_blacklist.zone", {defpol=Policy.Custom, defcontent="%s"})`+"\n", lamanLabuhIP)
+	} else {
+		luaContent += `rpzFile("/etc/powerdns/custom_blacklist.zone")` + "\n"
+	}
 
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
@@ -1452,6 +1458,7 @@ func syncRPZWorker() {
 			if errWrite == nil {
 				// Signal PowerDNS to instantly reload latest compiled policies
 				exec.Command("rec_control", "reload-lua-config").Run()
+				exec.Command("rec_control", "reload-zones").Run()
 				exec.Command("rec_control", "wipe-cache", "$").Run()
 				exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"UNBOUND\"):getCache():expunge(0)").Run()
 
