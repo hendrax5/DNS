@@ -1311,12 +1311,12 @@ func syncRPZWorker() {
 			// Load Laman Labuh Action
 			var ipListStr string
 			db.QueryRow("SELECT value FROM settings WHERE key = 'laman_labuh_ip'").Scan(&ipListStr)
-			blockAction := "CNAME ."
+			blockAction := "IN CNAME ."
 			masterRedirect := ""
 			for _, ip := range strings.Split(ipListStr, "\n") {
 				if ip = strings.TrimSpace(ip); ip != "" {
-					blockAction = "A " + ip
-					masterRedirect = "redirect A " + ip
+					blockAction = "IN A " + ip
+					masterRedirect = "redirect IN A " + ip
 					break
 				}
 			}
@@ -1450,7 +1450,7 @@ func syncRPZWorker() {
 
 			// Write Whitelist explicit rules at bottom to guarantee parsing validity
 			for d := range wlMap {
-				compiledLines = append(compiledLines, fmt.Sprintf("%s CNAME rpz-passthru.", d))
+				compiledLines = append(compiledLines, fmt.Sprintf("%s IN CNAME rpz-passthru.", d))
 			}
 
 			// Write Compiled RPZ Zone Master to disk
