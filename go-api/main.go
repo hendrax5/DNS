@@ -1943,6 +1943,8 @@ func writeCustomRPZ() {
 	
 	// Command PowerDNS to reload RPZ silently (without dropping packets)
 	exec.Command("rec_control", "reload-zones").Run()
+	exec.Command("rec_control", "wipe-cache", "$").Run()
+	exec.Command("dnsdist", "--config", "/etc/powerdns/dnsdist.conf", "-c", "127.0.0.1:5199", "-k", "odCw4adPMwaEYslkALNwp4K7UksD3av9TGpDeSge814=", "-e", "getPool(\"UNBOUND\"):getCache():expunge(0)").Run()
 }
 
 func SearchRPZ(c *fiber.Ctx) error {
