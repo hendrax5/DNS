@@ -91,12 +91,8 @@ do_upgrade() {
 }
 
 do_docker_rebuild() {
-    echo "🧹 Membersihkan aturan NAT/TProxy sementara agar kontainer Docker bisa mengakses internet / DNS eksternal..."
-    iptables -t nat -D PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
-    iptables -t nat -D PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
-    iptables -t nat -D OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
-    iptables -t nat -D OUTPUT -p tcp --dport 53 -j REDIRECT --to-ports 53 2>/dev/null
-    iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 80 2>/dev/null
+    echo "🧹 Membersihkan aturan NAT/TProxy nftables sementara agar kontainer Docker bisa mengakses internet / DNS eksternal..."
+    nft flush table ip netshield_nat 2>/dev/null || true
 
     echo "[Docker] Melakukan Rebuild Image DNS dengan Mode Jaringan Host (Mencegah Error DNS)..."
     cd "$DIR" || exit

@@ -281,13 +281,14 @@ func main() {
 		db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('tproxy_enabled', 'false')")
 		db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
 
-		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-		exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "REDIRECT", "--to-ports", "80").Run()
+		exec.Command("bash", "-c", "nft add table ip netshield_nat || true").Run()
+		exec.Command("bash", "-c", "nft flush table ip netshield_nat").Run()
+		exec.Command("bash", "-c", "nft add chain ip netshield_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'").Run()
+		
 		if req.Tproxy {
-			exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-			exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-			exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "REDIRECT", "--to-ports", "80").Run()
+			exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting udp dport 53 redirect to :53").Run()
+			exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 53 redirect to :53").Run()
+			exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 80 redirect to :53").Run()
 		}
 		return c.SendString("OK")
 	})
@@ -739,14 +740,15 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'max_qps_per_ip'", maxQpsStr)
 
-	// Execute TProxy IPtables
-	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-	exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "REDIRECT", "--to-ports", "80").Run()
+	// Execute TProxy nftables
+	exec.Command("bash", "-c", "nft add table ip netshield_nat || true").Run()
+	exec.Command("bash", "-c", "nft flush table ip netshield_nat").Run()
+	exec.Command("bash", "-c", "nft add chain ip netshield_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'").Run()
+	
 	if req.Tproxy {
-		exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-		exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53").Run()
-		exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "REDIRECT", "--to-ports", "80").Run()
+		exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting udp dport 53 redirect to :53").Run()
+		exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 53 redirect to :53").Run()
+		exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 80 redirect to :53").Run()
 	}
 
 	generateLuaConfig()

@@ -31,7 +31,7 @@ RUN gcc -O3 -shared -fPIC -I/usr/include/lua5.4 -o bloom_native.so bloom_native.
 # Final Stage: PowerDNS + Supervisord + XDP + GoBGP
 FROM alpine:latest
 RUN apk add --no-cache supervisor dnsdist unbound pdns-recursor lua sqlite tzdata bind-tools numactl curl \
-    iproute2 bpftool && \
+    iproute2 bpftool nftables && \
     curl -sL https://github.com/osrg/gobgp/releases/download/v3.31.0/gobgp_3.31.0_linux_amd64.tar.gz -o gobgp.tar.gz && \
     tar -xzf gobgp.tar.gz && \
     mv gobgpd /usr/local/bin/ && \
