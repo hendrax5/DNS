@@ -20,6 +20,13 @@ RUN clang -O2 -target bpf -c dns_filter.c -o dns_filter.o && \
     echo "✅ XDP compiled successfully" || \
     (echo "⚠️ XDP compilation failed" && touch dns_filter.o)
 
+# Stage 4: Compile DNSDist Lua Native C Extension
+FROM alpine:latest AS lua-c-builder
+RUN apk add --no-cache gcc musl-dev lua5.4-dev
+WORKDIR /c-ext
+COPY pdns_config/bloom_native.c .
+RUN gcc -O3 -shared -fPIC -I/usr/include/lua5.4 -o bloom_native.so bloom_native.c
+
 
 # Final Stage: PowerDNS + Supervisord + XDP + GoBGP
 FROM alpine:latest
@@ -48,6 +55,7 @@ RUN chmod +x /etc/xdp/xdp_manager.sh
 # Copy configurations
 COPY supervisord.conf /etc/supervisord.conf
 COPY pdns_config/ /etc/powerdns/
+COPY --from=lua-c-builder /c-ext/bloom_native.so /etc/powerdns/bloom_native.so
 
 # Setup directories
 RUN mkdir -p /var/run/pdns-recursor /var/run/unbound /var/log/supervisor /data /etc/powerdns/tls /sys/fs/bpf && \

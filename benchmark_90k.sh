@@ -36,7 +36,7 @@ rm -f dnsperf_sim_*.log
 
 # Fork N buah proses dnsperf ke latar belakang
 for i in $(seq 1 $THREADS); do
-    dnsperf -s "$IP" -d "$FILE" -l "$TIME" > "dnsperf_sim_${i}.log" 2>&1 &
+    dnsperf -s "$IP" -d "$FILE" -l "$TIME" -c 100 -Q 6000 > "dnsperf_sim_${i}.log" 2>&1 &
 done
 
 # Tunggu seluruh proses selesai

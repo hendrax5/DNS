@@ -29,10 +29,44 @@ net.netfilter.nf_conntrack_max=2000000
 
 # File Descriptors Limit
 fs.file-max=2097152
+
+# Low Latency Polling (Bypass IRQ Wait / Kurangi Syscall Overhead)
+net.core.busy_poll=50
+net.core.busy_read=50
 EOF
 
 # Reload Konfigurasi
 sysctl -p /etc/sysctl.d/99-netshield-dns.conf
+
+# Ekstraksi: Force TSC Clocksource di Hard-Level OS via GRUB
+if [ -f "/etc/default/grub" ]; then
+    echo "Memeriksa parameter booting GRUB untuk optimasi TSC Clocksource..."
+    if ! grep -q "tsc=reliable" /etc/default/grub; then
+        echo "⚙️ Memasang TSC Clocksource ke GRUB_CMDLINE_LINUX_DEFAULT..."
+        sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="tsc=reliable clocksource=tsc /' /etc/default/grub
+        
+        if command -v update-grub &> /dev/null; then
+            update-grub
+            echo "✅ GRUB berhasil diupdate! TSC akan aktif setelah SERVER REBOOT."
+        else
+            echo "⚠️ update-grub tidak ditemukan. Jalankan manual pembaruan bootloader Anda."
+        fi
+    else
+        echo "✅ TSC Clocksource sudah terpasang di GRUB."
+    fi
+fi
+
+# Ekstraksi: Tuning Interupsi Kartu Jaringan (NIC) secara Dinamis
+MAIN_IFACE=$(ip -o route get to 8.8.8.8 | awk '{print $5}' | head -n 1)
+if [ -n "$MAIN_IFACE" ]; then
+    echo "⚙️ Menerapkan Zero-Latency NIC Tuning (rx-usecs 0) pada Network Interface: $MAIN_IFACE"
+    if command -v ethtool &> /dev/null; then
+        ethtool -C "$MAIN_IFACE" rx-usecs 0 2>/dev/null
+        echo "✅ NIC Interrupt Tweak selesai."
+    else
+        echo "⚠️ Etool Tool tidak di-install. Mengabaikan tuning NIC."
+    fi
+fi
 
 echo "---------------------------------------------------------"
 echo "✔ Optimization Applied Successfully!"
