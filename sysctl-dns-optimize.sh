@@ -47,9 +47,15 @@ if [ -f "/etc/default/grub" ]; then
         
         if command -v update-grub &> /dev/null; then
             update-grub
-            echo "✅ GRUB berhasil diupdate! TSC akan aktif setelah SERVER REBOOT."
+            echo "✅ GRUB berhasil diupdate (Debian/Ubuntu)! TSC akan aktif setelah SERVER REBOOT."
+        elif command -v grub2-mkconfig &> /dev/null && [ -f /boot/grub2/grub.cfg ]; then
+            grub2-mkconfig -o /boot/grub2/grub.cfg
+            echo "✅ GRUB berhasil diupdate (RHEL/CentOS)! TSC akan aktif setelah SERVER REBOOT."
+        elif command -v grub-mkconfig &> /dev/null && [ -f /boot/grub/grub.cfg ]; then
+            grub-mkconfig -o /boot/grub/grub.cfg
+            echo "✅ GRUB berhasil diupdate (Arch/Generic Linux)! TSC akan aktif setelah SERVER REBOOT."
         else
-            echo "⚠️ update-grub tidak ditemukan. Jalankan manual pembaruan bootloader Anda."
+            echo "⚠️ GRUB updater tidak ditemukan. Jalankan manual pembaruan bootloader Anda."
         fi
     else
         echo "✅ TSC Clocksource sudah terpasang di GRUB."
