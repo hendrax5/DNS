@@ -38,42 +38,7 @@ EOF
 # Reload Konfigurasi
 sysctl -p /etc/sysctl.d/99-netshield-dns.conf
 
-# Ekstraksi: Force TSC Clocksource di Hard-Level OS via GRUB
-if [ -f "/etc/default/grub" ]; then
-    echo "Memeriksa parameter booting GRUB untuk optimasi TSC Clocksource & Virtualisasi (KVM)..."
-    if ! grep -q "tsc=reliable" /etc/default/grub; then
-        echo "⚙️ Memasang TSC Clocksource & KVM Optimizations ke GRUB_CMDLINE_LINUX_DEFAULT..."
-        sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="tsc=reliable clocksource=tsc mitigations=off processor.max_cstate=1 intel_idle.max_cstate=0 pcie_aspm=off /' /etc/default/grub
-        
-        if command -v update-grub &> /dev/null; then
-            update-grub
-            echo "✅ GRUB berhasil diupdate (Debian/Ubuntu)! TSC akan aktif setelah SERVER REBOOT."
-        elif command -v grub2-mkconfig &> /dev/null && [ -f /boot/grub2/grub.cfg ]; then
-            grub2-mkconfig -o /boot/grub2/grub.cfg
-            echo "✅ GRUB berhasil diupdate (RHEL/CentOS)! TSC akan aktif setelah SERVER REBOOT."
-        elif command -v grub-mkconfig &> /dev/null && [ -f /boot/grub/grub.cfg ]; then
-            grub-mkconfig -o /boot/grub/grub.cfg
-            echo "✅ GRUB berhasil diupdate (Arch/Generic Linux)! TSC akan aktif setelah SERVER REBOOT."
-        else
-            echo "⚠️ GRUB updater tidak ditemukan. Jalankan manual pembaruan bootloader Anda."
-        fi
-    else
-        echo "✅ TSC Clocksource sudah terpasang di GRUB."
-    fi
-fi
-
-# Ekstraksi: Tuning Interupsi Kartu Jaringan (NIC) secara Dinamis
-MAIN_IFACE=$(ip -o route get to 8.8.8.8 | awk '{print $5}' | head -n 1)
-if [ -n "$MAIN_IFACE" ]; then
-    echo "⚙️ Menerapkan Zero-Latency NIC Tuning (rx-usecs 0) pada Network Interface: $MAIN_IFACE"
-    if command -v ethtool &> /dev/null; then
-        ethtool -C "$MAIN_IFACE" rx-usecs 0 2>/dev/null
-        echo "✅ NIC Interrupt Tweak selesai."
-    else
-        echo "⚠️ Etool Tool tidak di-install. Mengabaikan tuning NIC."
-    fi
-fi
-
+# (GRUB and ethtool overrides removed due to KVM/AMD performance issues)
 echo "---------------------------------------------------------"
 echo "✔ Optimization Applied Successfully!"
 echo "Sangat disarankan menjalankan NetShield DNS menggunakan 'docker-compose up -d' agar ulimit file dapat ter-load."
