@@ -40,10 +40,10 @@ sysctl -p /etc/sysctl.d/99-netshield-dns.conf
 
 # Ekstraksi: Force TSC Clocksource di Hard-Level OS via GRUB
 if [ -f "/etc/default/grub" ]; then
-    echo "Memeriksa parameter booting GRUB untuk optimasi TSC Clocksource..."
+    echo "Memeriksa parameter booting GRUB untuk optimasi TSC Clocksource & Virtualisasi (KVM)..."
     if ! grep -q "tsc=reliable" /etc/default/grub; then
-        echo "⚙️ Memasang TSC Clocksource ke GRUB_CMDLINE_LINUX_DEFAULT..."
-        sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="tsc=reliable clocksource=tsc /' /etc/default/grub
+        echo "⚙️ Memasang TSC Clocksource & KVM Optimizations ke GRUB_CMDLINE_LINUX_DEFAULT..."
+        sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="tsc=reliable clocksource=tsc mitigations=off processor.max_cstate=1 intel_idle.max_cstate=0 pcie_aspm=off /' /etc/default/grub
         
         if command -v update-grub &> /dev/null; then
             update-grub
