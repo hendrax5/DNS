@@ -80,6 +80,12 @@ do_upgrade() {
     git log -1 --oneline
     echo ""
     
+    # Menerapkan Tuning OS Kernel (Sysctl) pasca-upgrade jika ada param baru
+    echo "[1.5/2] Memastikan Tuning OS Kernel Terbaru (Sysctl/GRUB)..."
+    if [ -f "$DIR/sysctl-dns-optimize.sh" ]; then
+        bash "$DIR/sysctl-dns-optimize.sh"
+    fi
+
     # Menjalankan rebuild dan merekam output ke file log
     do_docker_rebuild 2>&1 | tee "$DIR/data/ota_update.log"
 }
@@ -179,6 +185,17 @@ show_post_deploy() {
     echo ""
     echo "🎉 DEPLOYMENT SELESAI"
     echo "==========================================================="
+    
+    echo ""
+    echo "⚠️  PENTING: Optimasi Kernel tingkat lanjut (seperti TSC Clocksource) memerlukan REBOOT SISTEM penuh."
+    read -p "❓ Ingin merestart server SEKARANG agar seluruh tuning hardware aktif secara sempurna? (y/n): " reboot_now
+    if [[ "$reboot_now" == "y" || "$reboot_now" == "Y" ]]; then
+        echo " 🔄 Mereboot sistem dalam 3 detik..."
+        sleep 3
+        sudo reboot
+    else
+        echo " ⚠️ Mohon pastikan mem-reboot manual server ini secepatnya agar perubahan GRUB dapat bekerja."
+    fi
 }
 
 show_header
