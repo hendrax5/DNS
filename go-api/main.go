@@ -562,10 +562,10 @@ func generateLuaConfig() {
 	for _, f := range axfrFeeds {
 		if f.Enabled && f.MasterIP != "" && f.ZoneName != "" {
 			if lamanLabuhIP != "" {
-				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="%s", dumpFile="/etc/powerdns/axfr_%s.zone"})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP, f.ZoneName)
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="%s", dumpFile="/etc/powerdns/axfr_%s.zone", axfrTimeout=1200, maxIdleTime=60})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP, f.ZoneName)
 			} else {
 				// Use Kominfo's default redirect if no local override
-				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {dumpFile="/etc/powerdns/axfr_%s.zone"})`+"\n", f.MasterIP, f.ZoneName, f.ZoneName)
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {dumpFile="/etc/powerdns/axfr_%s.zone", axfrTimeout=1200, maxIdleTime=60})`+"\n", f.MasterIP, f.ZoneName, f.ZoneName)
 			}
 		}
 	}
