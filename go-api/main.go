@@ -571,8 +571,8 @@ func generateLuaConfig() {
 			if lamanLabuhIP != "" {
 				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.Custom, defcontent="%s", dumpFile="/etc/powerdns/axfr_%s.zone", axfrTimeout=1200, maxIdleTime=60})`+"\n", f.MasterIP, f.ZoneName, lamanLabuhIP, f.ZoneName)
 			} else {
-				// Use Kominfo's default redirect if no local override
-				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {dumpFile="/etc/powerdns/axfr_%s.zone", axfrTimeout=1200, maxIdleTime=60})`+"\n", f.MasterIP, f.ZoneName, f.ZoneName)
+				// Prevent recursive timeout on badly-formatted Kominfo CNAMEs
+				luaContent += fmt.Sprintf(`rpzMaster({"%s"}, "%s", {defpol=Policy.NXDOMAIN, dumpFile="/etc/powerdns/axfr_%s.zone", axfrTimeout=1200, maxIdleTime=60})`+"\n", f.MasterIP, f.ZoneName, f.ZoneName)
 			}
 		}
 	}
