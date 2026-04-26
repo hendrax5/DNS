@@ -449,7 +449,10 @@ function App() {
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-7 h-7 text-emerald-500" />
             <div className="flex flex-col justify-center">
-              <span className="text-xl font-bold tracking-tight text-white leading-none">NetShield<span className="text-slate-400 font-medium">Enterprise</span></span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold tracking-tight text-white leading-none">NetShield<span className="text-slate-400 font-medium">Enterprise</span></span>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#E6E6FA] bg-gradient-to-r from-indigo-500/30 to-fuchsia-500/30 border border-indigo-500/30 rounded-md shadow-sm">V6.1 CGE</span>
+              </div>
               <span className="text-[10px] text-emerald-400 font-semibold tracking-wide uppercase mt-0.5">supported by ServiceX</span>
             </div>
           </div>
@@ -1808,7 +1811,7 @@ function App() {
                     </h2>
                     <p className="text-slate-400 text-sm mt-3 leading-relaxed max-w-3xl">
                       Perbarui sistem operasi secara luring (OTA Image) dengan menarik Firmware dari Git Server tanpa memutus fungsi DNS Lunas. 
-                      Sistem NetShield V5 ditanamkan secara otonom dalam OS Host (ISO). 
+                      Sistem NetShield V6.1 (Carrier-Grade Edition) ditanamkan secara otonom dalam OS Host (ISO). 
                     </p>
                   </div>
                   <div className="p-8 flex flex-col md:flex-row gap-8 items-start">
