@@ -98,6 +98,25 @@ File *.iso* instalasi yang memuat OS + NetShield Offline siap ditanam di rak *Ba
 3. **Mengarahkan Trafik (Force Forwarding)**
    Bagi Mikrotik:
    `add action=dst-nat chain=dstnat dst-port=53 protocol=udp to-addresses=<IP_NETSHIELD> to-ports=53`
+   
+   Bagi Juniper MX (menggunakan Filter-Based Forwarding / PBR):
+   ```junos
+   # 1. Routing-Instance PBR
+   set routing-instances NETSHIELD_VRF instance-type forwarding
+   set routing-instances NETSHIELD_VRF routing-options static route 0.0.0.0/0 next-hop <IP_NETSHIELD>
+   
+   # 2. Firewall Filter untuk menangkap DNS Port 53
+   set firewall filter CEGAT_DNS term MATCH_DNS_UDP from protocol udp
+   set firewall filter CEGAT_DNS term MATCH_DNS_UDP from destination-port 53
+   set firewall filter CEGAT_DNS term MATCH_DNS_UDP then routing-instance NETSHIELD_VRF
+   set firewall filter CEGAT_DNS term MATCH_DNS_TCP from protocol tcp
+   set firewall filter CEGAT_DNS term MATCH_DNS_TCP from destination-port 53
+   set firewall filter CEGAT_DNS term MATCH_DNS_TCP then routing-instance NETSHIELD_VRF
+   set firewall filter CEGAT_DNS term ALLOW_ALL then accept
+   
+   # 3. Menerapkan Filter pada Interface Pelanggan
+   set interfaces xe-0/0/0 unit 0 family inet filter input CEGAT_DNS
+   ```
 4. **Memeriksa Isi Direktori dan File Pemblokiran di Docker**
    Jika ingin memastikan daftar hitam, whitelist, atau RPZ feed benar-benar telah dimasukkan ke dalam mesin DNS, Anda dapat masuk ke dalam container shell:
    ```bash
