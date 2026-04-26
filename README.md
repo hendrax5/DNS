@@ -98,6 +98,21 @@ File *.iso* instalasi yang memuat OS + NetShield Offline siap ditanam di rak *Ba
 3. **Mengarahkan Trafik (Force Forwarding)**
    Bagi Mikrotik:
    `add action=dst-nat chain=dstnat dst-port=53 protocol=udp to-addresses=<IP_NETSHIELD> to-ports=53`
+4. **Memeriksa Isi Direktori dan File Pemblokiran di Docker**
+   Jika ingin memastikan daftar hitam, whitelist, atau RPZ feed benar-benar telah dimasukkan ke dalam mesin DNS, Anda dapat masuk ke dalam container shell:
+   ```bash
+   # Masuk ke environment shell alpine
+   docker exec -it netshield-v2 sh
+   
+   # Berpindah ke folder utama
+   cd /etc/powerdns
+   
+   # Memeriksa eksistensi hasil kompilasi
+   ls -la
+   
+   # Mencari domain spesifik di dalam antrean pemblokiran
+   grep "pornhub.com" rpz_compiled.zone
+   ```
 
 ---
 *NetShield V6.0 — Mengawal Privasi Tanpa Mengorbankan Latensi Mutlak.* 🦅
