@@ -1430,6 +1430,42 @@ func syncRPZWorker() {
 			feedMutex.Lock()
 			feedStatuses = newStatuses
 			feedMutex.Unlock()
+
+			// --- INJECT AXFR PARSING FOR BLOOM FILTER SYNC ---
+			axfrFiles, errGlob := filepath.Glob("/etc/powerdns/axfr_*.zone")
+			if errGlob == nil {
+				for _, axfrFile := range axfrFiles {
+					base := filepath.Base(axfrFile)
+					zoneName := strings.TrimPrefix(base, "axfr_")
+					zoneName = strings.TrimSuffix(zoneName, ".zone")
+					
+					fileBytes, errRead := ioutil.ReadFile(axfrFile)
+					if errRead == nil {
+						lines := strings.Split(string(fileBytes), "\n")
+						for _, line := range lines {
+							line = strings.TrimSpace(line)
+							if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "$") {
+								continue
+							}
+							
+							parts := strings.Fields(line)
+							if len(parts) > 0 {
+								domain := parts[0]
+								// Clean up standard AXFR format (e.g. *.yuksega4d.xyz.trustpositifkominfo.)
+								domain = strings.TrimPrefix(domain, "*.")
+								domain = strings.TrimSuffix(domain, "." + zoneName + ".")
+								
+								domain = sanitizeDomain(domain)
+								if domain != "" && !wlMap[domain] && strings.Contains(domain, ".") {
+									domainMap[domain] = struct{}{}
+								}
+							}
+						}
+					}
+				}
+			}
+			// --- END AXFR INJECTION ---
+
 			// DIRECT MAPPING WITHOUT HEURISTICS
 			finalDomains := make(map[string]struct{})
 			for d := range domainMap {
