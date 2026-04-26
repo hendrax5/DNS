@@ -27,7 +27,8 @@ import {
   CloudCog,
   MonitorCheck,
   Terminal,
-  CloudDownload
+  CloudDownload,
+  Network
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import Zones from './pages/Zones';
@@ -115,6 +116,9 @@ function App() {
   const [editingPeerIndex, setEditingPeerIndex] = useState(null);
   const [bgpConfig, setBgpConfig] = useState({
     enabled: false, local_asn: 65000, router_id: '127.0.0.1', peers: []
+  });
+  const [topology, setTopology] = useState({
+    node_role: 'master', master_node_url: '', slave_ips: ''
   });
 
   // OTA Config
@@ -265,6 +269,10 @@ function App() {
       if(dataFwd.domain_forwarders !== undefined) setDomainForwarders(dataFwd.domain_forwarders);
       if(dataFwd.parent_resolvers) setParentResolvers(dataFwd.parent_resolvers);
       if(dataFwd.resolver_mode) setResolverMode(dataFwd.resolver_mode);
+
+      const resTop = await apiFetch('/api/topology');
+      const dataTop = await resTop.json();
+      if(dataTop.node_role) setTopology(dataTop);
 
       const resAdv = await apiFetch('/api/advanced-config');
       const dataAdv = await resAdv.json();
@@ -434,6 +442,17 @@ function App() {
     } catch(e) { showNotification('Failed to upload Forwarders', 'error'); }
   };
 
+  const saveTopology = async () => {
+    try {
+      await apiFetch('/api/topology', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(topology)
+      });
+      showNotification('Topologi Node berhasil diperbarui! Akses Master & Slave langsung efektif.', 'success');
+    } catch(e) { showNotification('Gagal memperbarui Topologi Node', 'error'); }
+  };
+
   const [chartData] = useState(() => Array.from({ length: 20 }).map((_, i) => ({
     time: i,
     qps: 120000 + Math.random() * 10000,
@@ -451,7 +470,7 @@ function App() {
             <div className="flex flex-col justify-center">
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold tracking-tight text-white leading-none">NetShield<span className="text-slate-400 font-medium">Enterprise</span></span>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#E6E6FA] bg-gradient-to-r from-indigo-500/30 to-fuchsia-500/30 border border-indigo-500/30 rounded-md shadow-sm">V6.1 CGE</span>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#E6E6FA] bg-gradient-to-r from-purple-500/30 to-indigo-500/30 border border-purple-500/30 rounded-md shadow-sm">V7.0 EDGE</span>
               </div>
               <span className="text-[10px] text-emerald-400 font-semibold tracking-wide uppercase mt-0.5">supported by ServiceX</span>
             </div>
@@ -843,6 +862,7 @@ function App() {
               <button onClick={() => setAdminTab('access')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'access' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><ShieldCheck className="w-4 h-4 inline-block mr-2" />Kontrol Akses</button>
               <button onClick={() => setAdminTab('options')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'options' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(217,119,6,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Server className="w-4 h-4 inline-block mr-2" />Opsi Keamanan</button>
               <button onClick={() => setAdminTab('bgp')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'bgp' ? 'bg-orange-600 text-white shadow-[0_0_15px_rgba(234,88,12,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Globe className="w-4 h-4 inline-block mr-2" />BGP & RTBH (Komdigi)</button>
+              <button onClick={() => setAdminTab('topology')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'topology' ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><Network className="w-4 h-4 inline-block mr-2" />Topologi Node</button>
               <button onClick={() => setAdminTab('ota')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${adminTab === 'ota' ? 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.3)]' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'}`}><RefreshCw className="w-4 h-4 inline-block mr-2" />Sistem OTA</button>
             </div>
 
@@ -1801,6 +1821,65 @@ function App() {
                 </div>
               )}
 
+              {/* === TAB: TOPOLOGY === */}
+              {adminTab === 'topology' && (
+                <>
+                  <div className="col-span-1 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+                    <div className="bg-slate-800/50 p-4 border-b border-slate-700/50 flex justify-between items-center">
+                      <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 uppercase tracking-wide">
+                        <Network className="w-4 h-4 text-purple-400" />
+                        Konfigurasi Peran Edge Node (Master / Slave)
+                      </h2>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-sm text-slate-400 mb-6">Pilih Mode Operasional Server. <b>Master</b> (Data Cruncher) menarik HTTP Feed lalu membuka API pendistribusi biner. <b>Slave</b> bertindak 100% pasif dengan mengunduh <code>bloom.bin</code> matang dari Master tanpa beban CPU (<span className="italic">Zero-CPU Spike</span>).</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <button onClick={() => setTopology({...topology, node_role: 'master'})} className={`p-4 border rounded-xl text-left transition-all ${topology.node_role === 'master' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/50'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-sm font-bold ${topology.node_role === 'master' ? 'text-purple-400' : 'text-slate-300'}`}>Mode Master Pusat</span>
+                            {topology.node_role === 'master' && <CheckCircle2 className="w-5 h-5 text-purple-500" />}
+                          </div>
+                          <p className="text-xs text-slate-500">Mengeksekusi perhitungan filter, regex, dan melayani Slave Node.</p>
+                        </button>
+
+                        <button onClick={() => setTopology({...topology, node_role: 'slave'})} className={`p-4 border rounded-xl text-left transition-all ${topology.node_role === 'slave' ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/50'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-sm font-bold ${topology.node_role === 'slave' ? 'text-indigo-400' : 'text-slate-300'}`}>Mode Slave Bouncer</span>
+                            {topology.node_role === 'slave' && <CheckCircle2 className="w-5 h-5 text-indigo-500" />}
+                          </div>
+                          <p className="text-xs text-slate-500">Trafik DNS Murni. Menonaktifkan penarikan upstream dan fokus filter data lokal murni.</p>
+                        </button>
+                      </div>
+
+                      {topology.node_role === 'master' && (
+                        <div className="bg-[#0b1120] border border-slate-800 rounded-lg p-4 mb-6">
+                           <h3 className="text-sm font-bold text-slate-300 mb-2">Slave IP Whitelist (IP yang Diizinkan Mengunduh dari Master)</h3>
+                           <p className="text-xs text-slate-500 mb-3">Masukkan IP publik server Slave yang diizinkan untuk menarik sinkronisasi (1 IP per baris).</p>
+                           <textarea className="w-full bg-slate-950 border border-slate-800 rounded outline-none focus:border-purple-500 transition-colors p-3 text-sm text-slate-300 font-mono h-32" value={topology.slave_ips} onChange={e => setTopology({...topology, slave_ips: e.target.value})} placeholder={"103.111.90.10\n103.111.90.11"} />
+                        </div>
+                      )}
+
+                      {topology.node_role === 'slave' && (
+                         <div className="bg-[#0b1120] border border-slate-800 rounded-lg p-4 mb-6">
+                           <h3 className="text-sm font-bold text-slate-300 mb-2">URL Master Node</h3>
+                           <p className="text-xs text-slate-500 mb-3">Tulis URL Master Node untuk mengunduh biner (contoh: <code>http://103.111.90.2:8080</code>).</p>
+                           <input type="text" className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 transition-colors rounded p-3 outline-none text-sm text-slate-300 font-mono" value={topology.master_node_url} onChange={e => setTopology({...topology, master_node_url: e.target.value})} placeholder="http://ip_master:8080" />
+                        </div>
+                      )}
+                      
+                    </div>
+                    
+                    <div className="p-4 border-t border-slate-800 bg-slate-900 flex justify-end px-6">
+                      <button onClick={saveTopology} className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-bold tracking-wide rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-colors cursor-pointer">
+                        Terapkan Topologi Node
+                      </button>
+                    </div>
+
+                  </div>
+                </>
+              )}
+
               {/* === TAB: OTA UPDATE === */}
               {adminTab === 'ota' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden col-span-full">
@@ -1811,7 +1890,7 @@ function App() {
                     </h2>
                     <p className="text-slate-400 text-sm mt-3 leading-relaxed max-w-3xl">
                       Perbarui sistem operasi secara luring (OTA Image) dengan menarik Firmware dari Git Server tanpa memutus fungsi DNS Lunas. 
-                      Sistem NetShield V6.1 (Carrier-Grade Edition) ditanamkan secara otonom dalam OS Host (ISO). 
+                      Sistem NetShield V7.0 (Edge Node Architecture) ditanamkan secara otonom dalam OS Host (ISO).
                     </p>
                   </div>
                   <div className="p-8 flex flex-col md:flex-row gap-8 items-start">

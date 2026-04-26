@@ -1,0 +1,852 @@
+🧹 Membersihkan aturan NAT/TProxy sementara agar kontainer Docker bisa mengakses internet / DNS eksternal...
+[Docker] Melakukan Rebuild Image DNS dengan Mode Jaringan Host (Mencegah Error DNS)...
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.79kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/golang:alpine
+#2 DONE 1.5s
+
+#3 [internal] load metadata for docker.io/library/ubuntu:22.04
+#3 DONE 1.6s
+
+#4 [internal] load metadata for docker.io/library/node:22-alpine
+#4 ...
+
+#5 [internal] load metadata for docker.io/library/alpine:latest
+#5 DONE 1.8s
+
+#4 [internal] load metadata for docker.io/library/node:22-alpine
+#4 DONE 2.1s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 116B done
+#6 DONE 0.0s
+
+#7 [backend-builder 1/4] FROM docker.io/library/golang:alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1
+#7 resolve docker.io/library/golang:alpine@sha256:f85330846cde1e57ca9ec309382da3b8e6ae3ab943d2739500e08c86393a21b1 0.1s done
+#7 DONE 0.1s
+
+#8 [lua-c-builder 1/5] FROM docker.io/library/alpine:latest@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+#8 resolve docker.io/library/alpine:latest@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 0.1s done
+#8 CACHED
+
+#9 [frontend-builder 1/4] FROM docker.io/library/node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+#9 resolve docker.io/library/node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f 0.1s done
+#9 DONE 0.1s
+
+#10 [xdp-builder 1/5] FROM docker.io/library/ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7
+#10 resolve docker.io/library/ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 0.1s done
+#10 CACHED
+
+#11 [backend-builder 2/4] WORKDIR /app
+#11 CACHED
+
+#12 [frontend-builder 2/4] WORKDIR /app
+#12 CACHED
+
+#13 [internal] load build context
+#13 transferring context: 3.95kB done
+#13 DONE 0.0s
+
+#14 [xdp-builder 2/5] RUN apt-get update && apt-get install -y --no-install-recommends clang llvm     && rm -rf /var/lib/apt/lists/*
+#14 ...
+
+#15 [frontend-builder 3/4] COPY frontend/ .
+#15 DONE 0.1s
+
+#16 [backend-builder 3/4] COPY go-api/ .
+#16 DONE 0.2s
+
+#17 [backend-builder 4/4] RUN go mod download && go build -o /app/netshield-api .
+#17 ...
+
+#18 [stage-4  2/12] RUN apk add --no-cache supervisor dnsdist unbound pdns-recursor lua sqlite tzdata bind-tools numactl curl     iproute2 bpftool &&     curl -sL https://github.com/osrg/gobgp/releases/download/v3.31.0/gobgp_3.31.0_linux_amd64.tar.gz -o gobgp.tar.gz &&     tar -xzf gobgp.tar.gz &&     mv gobgpd /usr/local/bin/ &&     mv gobgp /usr/local/bin/ &&     rm gobgp.tar.gz &&     touch /etc/gobgpd.toml
+#18 0.674 (  1/132) Installing fstrm (0.6.1-r4)
+#18 0.691 (  2/132) Installing krb5-conf (1.0-r2)
+#18 0.704 (  3/132) Installing libcom_err (1.47.3-r0)
+#18 0.719 (  4/132) Installing keyutils-libs (1.6.3-r4)
+#18 0.733 (  5/132) Installing libverto (0.3.2-r2)
+#18 0.746 (  6/132) Installing krb5-libs (1.22.1-r0)
+#18 0.804 (  7/132) Installing json-c (0.18-r1)
+#18 0.818 (  8/132) Installing nghttp2-libs (1.68.0-r0)
+#18 0.833 (  9/132) Installing protobuf-c (1.5.2-r2)
+#18 0.847 ( 10/132) Installing userspace-rcu (0.15.3-r0)
+#18 0.864 ( 11/132) Installing libuv (1.51.0-r0)
+#18 0.882 ( 12/132) Installing xz-libs (5.8.2-r0)
+#18 0.898 ( 13/132) Installing libxml2 (2.13.9-r0)
+#18 0.921 ( 14/132) Installing bind-libs (9.20.22-r0)
+#18 0.959 ( 15/132) Installing bind-tools (9.20.22-r0)
+#18 0.981 ( 16/132) Installing libtraceevent (1.8.6-r1)
+#18 1.000 ( 17/132) Installing libtraceevent-plugins (1.8.6-r1)
+#18 1.017 ( 18/132) Installing libffi (3.5.2-r0)
+#18 1.032 ( 19/132) Installing libgcc (15.2.0-r2)
+#18 1.048 ( 20/132) Installing libstdc++ (15.2.0-r2)
+#18 1.095 ( 21/132) Installing zstd-libs (1.5.7-r2)
+#18 1.116 ( 22/132) Installing llvm21-libs (21.1.2-r1)
+#18 2.997 ( 23/132) Installing libelf (0.194-r0)
+#18 3.013 ( 24/132) Installing libbz2 (1.0.8-r6)
+#18 3.029 ( 25/132) Installing musl-fts (1.2.7-r7)
+#18 3.047 ( 26/132) Installing libdw (0.194-r0)
+#18 3.069 ( 27/132) Installing numactl (2.0.18-r0)
+#18 3.084 ( 28/132) Installing libexpat (2.7.5-r0)
+#18 3.100 ( 29/132) Installing gdbm (1.26-r0)
+#18 3.116 ( 30/132) Installing mpdecimal (4.0.1-r0)
+#18 3.133 ( 31/132) Installing ncurses-terminfo-base (6.5_p20251123-r0)
+#18 3.160 ( 32/132) Installing libncursesw (6.5_p20251123-r0)
+#18 3.179 ( 33/132) Installing libpanelw (6.5_p20251123-r0)
+#18 3.193 ( 34/132) Installing readline (8.3.1-r0)
+#18 3.213 ( 35/132) Installing sqlite-libs (3.51.2-r0)
+#18 3.259 ( 36/132) Installing python3 (3.12.13-r0)
+#18 3.656 ( 37/132) Installing python3-pycache-pyc0 (3.12.13-r0)
+#18 3.985 ( 38/132) Installing pyc (3.12.13-r0)
+#18 3.985 ( 39/132) Installing python3-pyc (3.12.13-r0)
+#18 3.985 ( 40/132) Installing slang (2.3.3-r3)
+#18 4.042 ( 41/132) Installing perf (6.19.8-r0)
+#18 4.192 ( 42/132) Installing libcap2 (2.78-r0)
+#18 4.207 ( 43/132) Installing libintl (0.24.1-r1)
+#18 4.222 ( 44/132) Installing libnl3 (3.11.0-r0)
+#18 4.251 ( 45/132) Installing pciutils-libs (3.14.0-r0)
+#18 4.270 ( 46/132) Installing cpupower (6.19.8-r0)
+#18 4.292 ( 47/132) Installing linux-tools-gpio (6.19.8-r0)
+#18 4.306 ( 48/132) Installing linux-tools-iio (6.19.8-r0)
+#18 4.494 ( 49/132) Installing bpftool (6.19.8-r0)
+#18 4.522 ( 50/132) Installing brotli-libs (1.2.0-r0)
+#18 4.554 ( 51/132) Installing c-ares (1.34.6-r0)
+#18 4.572 ( 52/132) Installing libunistring (1.4.1-r0)
+#18 4.619 ( 53/132) Installing libidn2 (2.3.8-r0)
+#18 4.637 ( 54/132) Installing nghttp3 (1.13.1-r0)
+#18 4.653 ( 55/132) Installing libpsl (0.21.5-r3)
+#18 4.669 ( 56/132) Installing libcurl (8.17.0-r1)
+#18 4.698 ( 57/132) Installing curl (8.17.0-r1)
+#18 4.717 ( 58/132) Installing dnsdist-common (2.0.4-r0)
+#18 4.731   Executing dnsdist-common-2.0.4-r0.pre-install
+#18 4.760 ( 59/132) Installing dnsdist-common-openrc (2.0.4-r0)
+#18 4.774 ( 60/132) Installing libedit (20251016.3.1-r0)
+#18 4.793 ( 61/132) Installing lmdb (0.9.33-r0)
+#18 4.811 ( 62/132) Installing lua5.4-libs (5.4.8-r0)
+#18 4.835 ( 63/132) Installing net-snmp-libs (5.9.5.2-r0)
+#18 4.880 ( 64/132) Installing net-snmp-agent-libs (5.9.5.2-r0)
+#18 4.924 ( 65/132) Installing abseil-cpp-city (20250814.1-r0)
+#18 4.939 ( 66/132) Installing abseil-cpp-hash (20250814.1-r0)
+#18 4.954 ( 67/132) Installing abseil-cpp-leak-check (20250814.1-r0)
+#18 4.968 ( 68/132) Installing abseil-cpp-log-internal-nullguard (20250814.1-r0)
+#18 4.981 ( 69/132) Installing abseil-cpp-raw-logging-internal (20250814.1-r0)
+#18 4.995 ( 70/132) Installing abseil-cpp-strings-internal (20250814.1-r0)
+#18 5.009 ( 71/132) Installing abseil-cpp-strings (20250814.1-r0)
+#18 5.025 ( 72/132) Installing abseil-cpp-log-internal-check-op (20250814.1-r0)
+#18 5.039 ( 73/132) Installing abseil-cpp-spinlock-wait (20250814.1-r0)
+#18 5.052 ( 74/132) Installing abseil-cpp-base (20250814.1-r0)
+#18 5.066 ( 75/132) Installing abseil-cpp-debugging-internal (20250814.1-r0)
+#18 5.083 ( 76/132) Installing abseil-cpp-malloc-internal (20250814.1-r0)
+#18 5.097 ( 77/132) Installing abseil-cpp-stacktrace (20250814.1-r0)
+#18 5.110 ( 78/132) Installing abseil-cpp-symbolize (20250814.1-r0)
+#18 5.124 ( 79/132) Installing abseil-cpp-examine-stack (20250814.1-r0)
+#18 5.138 ( 80/132) Installing abseil-cpp-log-globals (20250814.1-r0)
+#18 5.152 ( 81/132) Installing abseil-cpp-log-internal-globals (20250814.1-r0)
+#18 5.167 ( 82/132) Installing abseil-cpp-int128 (20250814.1-r0)
+#18 5.180 ( 83/132) Installing abseil-cpp-str-format-internal (20250814.1-r0)
+#18 5.195 ( 84/132) Installing abseil-cpp-time-zone (20250814.1-r0)
+#18 5.210 ( 85/132) Installing abseil-cpp-time (20250814.1-r0)
+#18 5.224 ( 86/132) Installing abseil-cpp-log-internal-format (20250814.1-r0)
+#18 5.238 ( 87/132) Installing abseil-cpp-log-sink (20250814.1-r0)
+#18 5.252 ( 88/132) Installing abseil-cpp-kernel-timeout-internal (20250814.1-r0)
+#18 5.265 ( 89/132) Installing abseil-cpp-tracing-internal (20250814.1-r0)
+#18 5.279 ( 90/132) Installing abseil-cpp-synchronization (20250814.1-r0)
+#18 5.294 ( 91/132) Installing abseil-cpp-log-internal-log-sink-set (20250814.1-r0)
+#18 5.307 ( 92/132) Installing abseil-cpp-log-internal-proto (20250814.1-r0)
+#18 5.323 ( 93/132) Installing abseil-cpp-log-internal-structured-proto (20250814.1-r0)
+#18 5.337 ( 94/132) Installing abseil-cpp-strerror (20250814.1-r0)
+#18 5.351 ( 95/132) Installing abseil-cpp-log-internal-message (20250814.1-r0)
+#18 5.367 ( 96/132) Installing abseil-cpp-hashtablez-sampler (20250814.1-r0)
+#18 5.381 ( 97/132) Installing abseil-cpp-raw-hash-set (20250814.1-r0)
+#18 5.395 ( 98/132) Installing icu-data-en (76.1-r1)
+#18 5.459   Executing icu-data-en-76.1-r1.post-install
+#18 5.463   * 
+#18 5.463   * If you need ICU with non-English locales and legacy charset support, install
+#18 5.463   * package icu-data-full.
+#18 5.463   * 
+#18 5.463 ( 99/132) Installing icu-libs (76.1-r1)
+#18 5.563 (100/132) Installing re2 (2025.11.05-r0)
+#18 5.589 (101/132) Installing py3-pybind11 (2.13.6-r0)
+#18 5.617 (102/132) Installing py3-pybind11-pyc (2.13.6-r0)
+#18 5.632 (103/132) Installing py3-re2 (2025.11.05-r0)
+#18 5.654 (104/132) Installing py3-re2-pyc (2025.11.05-r0)
+#18 5.670 (105/132) Installing libsodium (1.0.20-r1)
+#18 5.690 (106/132) Installing dnsdist (2.0.4-r0)
+#18 5.835 (107/132) Installing libmnl (1.0.5-r2)
+#18 5.849 (108/132) Installing iproute2-minimal (6.17.0-r0)
+#18 5.885 (109/132) Installing libxtables (1.8.11-r1)
+#18 5.903 (110/132) Installing iproute2-tc (6.17.0-r0)
+#18 5.931 (111/132) Installing iproute2-ss (6.17.0-r0)
+#18 5.965 (112/132) Installing iproute2 (6.17.0-r0)
+#18 5.985   Executing iproute2-6.17.0-r0.post-install
+#18 5.988 (113/132) Installing lua5.4 (5.4.8-r0)
+#18 6.008 (114/132) Installing pdns-recursor-common (5.3.5-r0)
+#18 6.022   Executing pdns-recursor-common-5.3.5-r0.pre-install
+#18 6.035 (115/132) Installing boost1.84-context (1.84.0-r3)
+#18 6.049 (116/132) Installing boost1.84-filesystem (1.84.0-r3)
+#18 6.094 (117/132) Installing pdns-recursor (5.3.5-r0)
+#18 6.312 (118/132) Installing sqlite (3.51.2-r0)
+#18 6.386 (119/132) Installing py3-parsing (3.2.5-r0)
+#18 6.408 (120/132) Installing py3-parsing-pyc (3.2.5-r0)
+#18 6.433 (121/132) Installing py3-packaging (25.0-r0)
+#18 6.451 (122/132) Installing py3-packaging-pyc (25.0-r0)
+#18 6.472 (123/132) Installing py3-setuptools (80.9.0-r2)
+#18 6.563 (124/132) Installing py3-setuptools-pyc (80.9.0-r2)
+#18 6.688 (125/132) Installing supervisor (4.3.0-r0)
+#18 6.737 (126/132) Installing supervisor-pyc (4.3.0-r0)
+#18 6.784 (127/132) Installing tzdata (2026a-r0)
+#18 6.847 (128/132) Installing dnssec-root (20250524-r0)
+#18 6.862 (129/132) Installing libevent (2.1.12-r8)
+#18 6.891 (130/132) Installing hiredis (1.3.0-r0)
+#18 6.907 (131/132) Installing unbound-libs (1.24.2-r0)
+#18 6.942 (132/132) Installing unbound (1.24.2-r0)
+#18 6.966   Executing unbound-1.24.2-r0.pre-install
+#18 ...
+
+#19 [frontend-builder 4/4] RUN npm install && npm run build
+#19 4.914 
+#19 4.914 added 257 packages, and audited 258 packages in 5s
+#19 4.914 
+#19 4.914 55 packages are looking for funding
+#19 4.914   run `npm fund` for details
+#19 4.921 
+#19 4.921 2 vulnerabilities (1 moderate, 1 high)
+#19 4.921 
+#19 4.921 To address all issues, run:
+#19 4.921   npm audit fix
+#19 4.921 
+#19 4.921 Run `npm audit` for details.
+#19 4.922 npm notice
+#19 4.922 npm notice New major version of npm available! 10.9.7 -> 11.13.0
+#19 4.922 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.13.0
+#19 4.922 npm notice To update run: npm install -g npm@11.13.0
+#19 4.922 npm notice
+#19 5.081 
+#19 5.081 > frontend@0.0.0 build
+#19 5.081 > vite build
+#19 5.081 
+#19 5.337 vite v8.0.3 building client environment for production...
+#19 5.351 [2Ktransforming...✓ 2279 modules transformed.
+#19 6.116 rendering chunks...
+#19 6.254 computing gzip size...
+#19 6.264 dist/index.html                   0.91 kB │ gzip:   0.47 kB
+#19 6.264 dist/assets/index-CSTnx86d.css   37.34 kB │ gzip:   7.12 kB
+#19 6.264 dist/assets/index-D4PlsnEp.js   661.27 kB │ gzip: 187.05 kB
+#19 6.264 
+#19 6.266 ✓ built in 926ms
+#19 6.266 [plugin builtin:vite-reporter] 
+#19 6.266 (!) Some chunks are larger than 500 kB after minification. Consider:
+#19 6.266 - Using dynamic import() to code-split the application
+#19 6.266 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+#19 6.266 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#19 DONE 6.9s
+
+#18 [stage-4  2/12] RUN apk add --no-cache supervisor dnsdist unbound pdns-recursor lua sqlite tzdata bind-tools numactl curl     iproute2 bpftool &&     curl -sL https://github.com/osrg/gobgp/releases/download/v3.31.0/gobgp_3.31.0_linux_amd64.tar.gz -o gobgp.tar.gz &&     tar -xzf gobgp.tar.gz &&     mv gobgpd /usr/local/bin/ &&     mv gobgp /usr/local/bin/ &&     rm gobgp.tar.gz &&     touch /etc/gobgpd.toml
+#18 7.056 Executing busybox-1.37.0-r30.trigger
+#18 7.073 OK: 299.2 MiB in 148 packages
+#18 ...
+
+#20 [lua-c-builder 2/5] RUN apk add --no-cache gcc musl-dev lua5.4-dev
+#20 0.728 ( 1/20) Installing libgcc (15.2.0-r2)
+#20 0.748 ( 2/20) Installing jansson (2.14.1-r0)
+#20 0.764 ( 3/20) Installing libstdc++ (15.2.0-r2)
+#20 0.834 ( 4/20) Installing zstd-libs (1.5.7-r2)
+#20 0.865 ( 5/20) Installing binutils (2.45.1-r0)
+#20 1.058 ( 6/20) Installing libgomp (15.2.0-r2)
+#20 1.079 ( 7/20) Installing libatomic (15.2.0-r2)
+#20 1.092 ( 8/20) Installing gmp (6.3.0-r4)
+#20 1.115 ( 9/20) Installing isl26 (0.26-r1)
+#20 1.176 (10/20) Installing mpfr4 (4.2.2-r0)
+#20 1.204 (11/20) Installing mpc1 (1.3.1-r1)
+#20 1.220 (12/20) Installing gcc (15.2.0-r2)
+#20 8.669 (13/20) Installing lua5.4-libs (5.4.8-r0)
+#20 ...
+
+#18 [stage-4  2/12] RUN apk add --no-cache supervisor dnsdist unbound pdns-recursor lua sqlite tzdata bind-tools numactl curl     iproute2 bpftool &&     curl -sL https://github.com/osrg/gobgp/releases/download/v3.31.0/gobgp_3.31.0_linux_amd64.tar.gz -o gobgp.tar.gz &&     tar -xzf gobgp.tar.gz &&     mv gobgpd /usr/local/bin/ &&     mv gobgp /usr/local/bin/ &&     rm gobgp.tar.gz &&     touch /etc/gobgpd.toml
+#18 DONE 8.7s
+
+#20 [lua-c-builder 2/5] RUN apk add --no-cache gcc musl-dev lua5.4-dev
+#20 8.690 (14/20) Installing ncurses-terminfo-base (6.5_p20251123-r0)
+#20 8.712 (15/20) Installing libncursesw (6.5_p20251123-r0)
+#20 8.736 (16/20) Installing readline (8.3.1-r0)
+#20 8.756 (17/20) Installing lua5.4 (5.4.8-r0)
+#20 8.774 (18/20) Installing pkgconf (2.5.1-r0)
+#20 ...
+
+#21 [stage-4  3/12] RUN cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime &&     echo "Asia/Jakarta" > /etc/timezone
+#21 DONE 0.2s
+
+#20 [lua-c-builder 2/5] RUN apk add --no-cache gcc musl-dev lua5.4-dev
+#20 8.803 (19/20) Installing lua5.4-dev (5.4.8-r0)
+#20 8.854 (20/20) Installing musl-dev (1.2.5-r23)
+#20 9.083 Executing busybox-1.37.0-r30.trigger
+#20 9.107 OK: 200.6 MiB in 36 packages
+#20 DONE 9.2s
+
+#14 [xdp-builder 2/5] RUN apt-get update && apt-get install -y --no-install-recommends clang llvm     && rm -rf /var/lib/apt/lists/*
+#14 0.598 Get:1 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+#14 0.694 Get:2 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+#14 1.819 Get:3 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3863 kB]
+#14 2.280 Get:4 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+#14 3.173 Get:5 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+#14 4.259 Get:6 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1792 kB]
+#14 4.766 Get:7 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [61.6 kB]
+#14 5.162 Get:8 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [6862 kB]
+#14 6.162 Get:9 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [164 kB]
+#14 7.119 Get:10 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [17.5 MB]
+#14 7.935 Get:11 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1292 kB]
+#14 ...
+
+#22 [lua-c-builder 3/5] WORKDIR /c-ext
+#22 DONE 0.1s
+
+#23 [lua-c-builder 4/5] COPY pdns_config/bloom_native.c .
+#23 DONE 0.1s
+
+#24 [lua-c-builder 5/5] RUN gcc -O3 -shared -fPIC -I/usr/include/lua5.4 -o bloom_native.so bloom_native.c
+#24 DONE 0.3s
+
+#14 [xdp-builder 2/5] RUN apt-get update && apt-get install -y --no-install-recommends clang llvm     && rm -rf /var/lib/apt/lists/*
+#14 9.817 Get:12 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [266 kB]
+#14 10.02 Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1601 kB]
+#14 10.23 Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [4191 kB]
+#14 10.48 Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [7066 kB]
+#14 10.96 Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [69.9 kB]
+#14 11.15 Get:17 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [82.7 kB]
+#14 11.35 Get:18 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [35.7 kB]
+#14 11.37 Fetched 45.5 MB in 11s (4074 kB/s)
+#14 11.37 Reading package lists...
+#14 12.46 Reading package lists...
+#14 13.35 Building dependency tree...
+#14 13.61 Reading state information...
+#14 13.89 The following additional packages will be installed:
+#14 13.89   binutils binutils-common binutils-x86-64-linux-gnu clang-14 gcc-11-base
+#14 13.89   lib32gcc-s1 lib32stdc++6 libasan6 libatomic1 libbinutils libbsd0
+#14 13.89   libc-dev-bin libc6-dev libc6-i386 libclang-common-14-dev libclang-cpp14
+#14 13.89   libclang1-14 libcrypt-dev libctf-nobfd0 libctf0 libedit2 libgc1
+#14 13.89   libgcc-11-dev libgomp1 libicu70 libitm1 libllvm14 liblsan0 libmd0 libnsl-dev
+#14 13.89   libobjc-11-dev libobjc4 libpfm4 libquadmath0 libstdc++-11-dev libtirpc-dev
+#14 13.89   libtsan0 libubsan1 libxml2 linux-libc-dev llvm-14 llvm-14-linker-tools
+#14 13.89   llvm-14-runtime llvm-runtime rpcsvc-proto
+#14 13.89 Suggested packages:
+#14 13.89   binutils-doc clang-14-doc glibc-doc manpages-dev libstdc++-11-doc
+#14 13.89   llvm-14-doc
+#14 13.89 Recommended packages:
+#14 13.89   llvm-14-dev python3 manpages manpages-dev libc-devtools binfmt-support
+#14 14.03 The following NEW packages will be installed:
+#14 14.03   binutils binutils-common binutils-x86-64-linux-gnu clang clang-14
+#14 14.03   gcc-11-base lib32gcc-s1 lib32stdc++6 libasan6 libatomic1 libbinutils libbsd0
+#14 14.03   libc-dev-bin libc6-dev libc6-i386 libclang-common-14-dev libclang-cpp14
+#14 14.03   libclang1-14 libcrypt-dev libctf-nobfd0 libctf0 libedit2 libgc1
+#14 14.03   libgcc-11-dev libgomp1 libicu70 libitm1 libllvm14 liblsan0 libmd0 libnsl-dev
+#14 14.03   libobjc-11-dev libobjc4 libpfm4 libquadmath0 libstdc++-11-dev libtirpc-dev
+#14 14.03   libtsan0 libubsan1 libxml2 linux-libc-dev llvm llvm-14 llvm-14-linker-tools
+#14 14.03   llvm-14-runtime llvm-runtime rpcsvc-proto
+#14 14.55 0 upgraded, 47 newly installed, 0 to remove and 1 not upgraded.
+#14 14.55 Need to get 98.3 MB of archives.
+#14 14.55 After this operation, 482 MB of additional disk space will be used.
+#14 14.55 Get:1 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmd0 amd64 1.0.4-1build1 [23.0 kB]
+#14 15.07 Get:2 http://archive.ubuntu.com/ubuntu jammy/main amd64 libbsd0 amd64 0.11.5-1 [44.8 kB]
+#14 15.34 Get:3 http://archive.ubuntu.com/ubuntu jammy/main amd64 libicu70 amd64 70.1-2 [10.6 MB]
+#14 ...
+
+#17 [backend-builder 4/4] RUN go mod download && go build -o /app/netshield-api .
+#17 DONE 17.9s
+
+#25 [stage-4  4/12] COPY --from=backend-builder /app/netshield-api /usr/local/bin/netshield-api
+#25 DONE 0.1s
+
+#26 [stage-4  5/12] COPY --from=frontend-builder /app/dist /var/www/html/
+#26 DONE 0.0s
+
+#14 [xdp-builder 2/5] RUN apt-get update && apt-get install -y --no-install-recommends clang llvm     && rm -rf /var/lib/apt/lists/*
+#14 18.31 Get:4 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libxml2 amd64 2.9.13+dfsg-1ubuntu0.11 [765 kB]
+#14 18.33 Get:5 http://archive.ubuntu.com/ubuntu jammy/main amd64 libedit2 amd64 3.1-20210910-1build1 [96.8 kB]
+#14 18.34 Get:6 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils-common amd64 2.38-4ubuntu2.12 [223 kB]
+#14 18.35 Get:7 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libbinutils amd64 2.38-4ubuntu2.12 [663 kB]
+#14 18.37 Get:8 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libctf-nobfd0 amd64 2.38-4ubuntu2.12 [108 kB]
+#14 18.37 Get:9 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libctf0 amd64 2.38-4ubuntu2.12 [103 kB]
+#14 18.38 Get:10 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils-x86-64-linux-gnu amd64 2.38-4ubuntu2.12 [2324 kB]
+#14 18.55 Get:11 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils amd64 2.38-4ubuntu2.12 [3184 B]
+#14 18.55 Get:12 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libllvm14 amd64 1:14.0.0-1ubuntu1.1 [24.0 MB]
+#14 19.58 Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-cpp14 amd64 1:14.0.0-1ubuntu1.1 [12.1 MB]
+#14 19.64 Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11-base amd64 11.4.0-1ubuntu1~22.04.3 [216 kB]
+#14 19.79 Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgomp1 amd64 12.3.0-1ubuntu1~22.04.3 [127 kB]
+#14 19.79 Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libitm1 amd64 12.3.0-1ubuntu1~22.04.3 [30.2 kB]
+#14 19.79 Get:17 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libatomic1 amd64 12.3.0-1ubuntu1~22.04.3 [10.5 kB]
+#14 19.79 Get:18 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasan6 amd64 11.4.0-1ubuntu1~22.04.3 [2283 kB]
+#14 19.80 Get:19 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 liblsan0 amd64 12.3.0-1ubuntu1~22.04.3 [1069 kB]
+#14 19.81 Get:20 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtsan0 amd64 11.4.0-1ubuntu1~22.04.3 [2260 kB]
+#14 19.82 Get:21 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libubsan1 amd64 12.3.0-1ubuntu1~22.04.3 [976 kB]
+#14 19.83 Get:22 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libquadmath0 amd64 12.3.0-1ubuntu1~22.04.3 [154 kB]
+#14 20.07 Get:23 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [2517 kB]
+#14 20.33 Get:24 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-dev-bin amd64 2.35-0ubuntu3.13 [20.3 kB]
+#14 20.33 Get:25 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-libc-dev amd64 5.15.0-176.186 [1327 kB]
+#14 20.34 Get:26 http://archive.ubuntu.com/ubuntu jammy/main amd64 libcrypt-dev amd64 1:4.4.27-1 [112 kB]
+#14 20.34 Get:27 http://archive.ubuntu.com/ubuntu jammy/main amd64 rpcsvc-proto amd64 1.4.2-0ubuntu6 [68.5 kB]
+#14 20.34 Get:28 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtirpc-dev amd64 1.3.2-2ubuntu0.1 [192 kB]
+#14 20.34 Get:29 http://archive.ubuntu.com/ubuntu jammy/main amd64 libnsl-dev amd64 1.3.0-2build2 [71.3 kB]
+#14 20.34 Get:30 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dev amd64 2.35-0ubuntu3.13 [2101 kB]
+#14 20.36 Get:31 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libstdc++-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [2101 kB]
+#14 20.56 Get:32 http://archive.ubuntu.com/ubuntu jammy/main amd64 libgc1 amd64 1:8.0.6-1.1build1 [96.8 kB]
+#14 20.58 Get:33 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libobjc4 amd64 12.3.0-1ubuntu1~22.04.3 [48.7 kB]
+#14 20.80 Get:34 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libobjc-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [196 kB]
+#14 20.80 Get:35 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-i386 amd64 2.35-0ubuntu3.13 [2837 kB]
+#14 21.07 Get:36 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 lib32gcc-s1 amd64 12.3.0-1ubuntu1~22.04.3 [63.9 kB]
+#14 21.07 Get:37 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 lib32stdc++6 amd64 12.3.0-1ubuntu1~22.04.3 [739 kB]
+#14 21.32 Get:38 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-common-14-dev amd64 1:14.0.0-1ubuntu1.1 [5975 kB]
+#14 21.35 Get:39 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 llvm-14-linker-tools amd64 1:14.0.0-1ubuntu1.1 [1355 kB]
+#14 21.35 Get:40 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang1-14 amd64 1:14.0.0-1ubuntu1.1 [6792 kB]
+#14 21.38 Get:41 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 clang-14 amd64 1:14.0.0-1ubuntu1.1 [81.2 kB]
+#14 21.38 Get:42 http://archive.ubuntu.com/ubuntu jammy/universe amd64 clang amd64 1:14.0-55~exp2 [3558 B]
+#14 21.38 Get:43 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 llvm-14-runtime amd64 1:14.0.0-1ubuntu1.1 [484 kB]
+#14 21.38 Get:44 http://archive.ubuntu.com/ubuntu jammy/universe amd64 llvm-runtime amd64 1:14.0-55~exp2 [3204 B]
+#14 21.38 Get:45 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpfm4 amd64 4.11.1+git32-gd0b85fb-1ubuntu0.1 [345 kB]
+#14 21.56 Get:46 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 llvm-14 amd64 1:14.0.0-1ubuntu1.1 [12.7 MB]
+#14 22.12 Get:47 http://archive.ubuntu.com/ubuntu jammy/universe amd64 llvm amd64 1:14.0-55~exp2 [3758 B]
+#14 22.23 debconf: delaying package configuration, since apt-utils is not installed
+#14 22.26 Fetched 98.3 MB in 8s (12.2 MB/s)
+#14 22.29 Selecting previously unselected package libmd0:amd64.
+#14 22.29 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 4393 files and directories currently installed.)
+#14 22.30 Preparing to unpack .../00-libmd0_1.0.4-1build1_amd64.deb ...
+#14 22.30 Unpacking libmd0:amd64 (1.0.4-1build1) ...
+#14 22.33 Selecting previously unselected package libbsd0:amd64.
+#14 22.33 Preparing to unpack .../01-libbsd0_0.11.5-1_amd64.deb ...
+#14 22.34 Unpacking libbsd0:amd64 (0.11.5-1) ...
+#14 22.36 Selecting previously unselected package libicu70:amd64.
+#14 22.37 Preparing to unpack .../02-libicu70_70.1-2_amd64.deb ...
+#14 22.37 Unpacking libicu70:amd64 (70.1-2) ...
+#14 22.47 Selecting previously unselected package libxml2:amd64.
+#14 22.47 Preparing to unpack .../03-libxml2_2.9.13+dfsg-1ubuntu0.11_amd64.deb ...
+#14 22.47 Unpacking libxml2:amd64 (2.9.13+dfsg-1ubuntu0.11) ...
+#14 22.50 Selecting previously unselected package libedit2:amd64.
+#14 22.51 Preparing to unpack .../04-libedit2_3.1-20210910-1build1_amd64.deb ...
+#14 22.51 Unpacking libedit2:amd64 (3.1-20210910-1build1) ...
+#14 22.53 Selecting previously unselected package binutils-common:amd64.
+#14 22.53 Preparing to unpack .../05-binutils-common_2.38-4ubuntu2.12_amd64.deb ...
+#14 22.53 Unpacking binutils-common:amd64 (2.38-4ubuntu2.12) ...
+#14 22.56 Selecting previously unselected package libbinutils:amd64.
+#14 22.56 Preparing to unpack .../06-libbinutils_2.38-4ubuntu2.12_amd64.deb ...
+#14 22.56 Unpacking libbinutils:amd64 (2.38-4ubuntu2.12) ...
+#14 22.59 Selecting previously unselected package libctf-nobfd0:amd64.
+#14 22.59 Preparing to unpack .../07-libctf-nobfd0_2.38-4ubuntu2.12_amd64.deb ...
+#14 22.59 Unpacking libctf-nobfd0:amd64 (2.38-4ubuntu2.12) ...
+#14 22.62 Selecting previously unselected package libctf0:amd64.
+#14 22.62 Preparing to unpack .../08-libctf0_2.38-4ubuntu2.12_amd64.deb ...
+#14 22.62 Unpacking libctf0:amd64 (2.38-4ubuntu2.12) ...
+#14 22.64 Selecting previously unselected package binutils-x86-64-linux-gnu.
+#14 22.64 Preparing to unpack .../09-binutils-x86-64-linux-gnu_2.38-4ubuntu2.12_amd64.deb ...
+#14 22.64 Unpacking binutils-x86-64-linux-gnu (2.38-4ubuntu2.12) ...
+#14 22.71 Selecting previously unselected package binutils.
+#14 22.71 Preparing to unpack .../10-binutils_2.38-4ubuntu2.12_amd64.deb ...
+#14 22.71 Unpacking binutils (2.38-4ubuntu2.12) ...
+#14 22.74 Selecting previously unselected package libllvm14:amd64.
+#14 22.74 Preparing to unpack .../11-libllvm14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 22.74 Unpacking libllvm14:amd64 (1:14.0.0-1ubuntu1.1) ...
+#14 22.98 Selecting previously unselected package libclang-cpp14.
+#14 22.98 Preparing to unpack .../12-libclang-cpp14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 22.98 Unpacking libclang-cpp14 (1:14.0.0-1ubuntu1.1) ...
+#14 23.11 Selecting previously unselected package gcc-11-base:amd64.
+#14 23.11 Preparing to unpack .../13-gcc-11-base_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.12 Unpacking gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 23.14 Selecting previously unselected package libgomp1:amd64.
+#14 23.14 Preparing to unpack .../14-libgomp1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.15 Unpacking libgomp1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 23.17 Selecting previously unselected package libitm1:amd64.
+#14 23.17 Preparing to unpack .../15-libitm1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.17 Unpacking libitm1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 23.20 Selecting previously unselected package libatomic1:amd64.
+#14 23.20 Preparing to unpack .../16-libatomic1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.20 Unpacking libatomic1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 23.23 Selecting previously unselected package libasan6:amd64.
+#14 23.23 Preparing to unpack .../17-libasan6_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.23 Unpacking libasan6:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 23.28 Selecting previously unselected package liblsan0:amd64.
+#14 23.28 Preparing to unpack .../18-liblsan0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.28 Unpacking liblsan0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 23.32 Selecting previously unselected package libtsan0:amd64.
+#14 23.32 Preparing to unpack .../19-libtsan0_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.32 Unpacking libtsan0:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 23.37 Selecting previously unselected package libubsan1:amd64.
+#14 23.37 Preparing to unpack .../20-libubsan1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.37 Unpacking libubsan1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 23.40 Selecting previously unselected package libquadmath0:amd64.
+#14 23.40 Preparing to unpack .../21-libquadmath0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.41 Unpacking libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 23.43 Selecting previously unselected package libgcc-11-dev:amd64.
+#14 23.43 Preparing to unpack .../22-libgcc-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.43 Unpacking libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 23.50 Selecting previously unselected package libc-dev-bin.
+#14 23.50 Preparing to unpack .../23-libc-dev-bin_2.35-0ubuntu3.13_amd64.deb ...
+#14 23.50 Unpacking libc-dev-bin (2.35-0ubuntu3.13) ...
+#14 23.52 Selecting previously unselected package linux-libc-dev:amd64.
+#14 23.52 Preparing to unpack .../24-linux-libc-dev_5.15.0-176.186_amd64.deb ...
+#14 23.52 Unpacking linux-libc-dev:amd64 (5.15.0-176.186) ...
+#14 23.66 Selecting previously unselected package libcrypt-dev:amd64.
+#14 23.66 Preparing to unpack .../25-libcrypt-dev_1%3a4.4.27-1_amd64.deb ...
+#14 23.67 Unpacking libcrypt-dev:amd64 (1:4.4.27-1) ...
+#14 23.69 Selecting previously unselected package rpcsvc-proto.
+#14 23.69 Preparing to unpack .../26-rpcsvc-proto_1.4.2-0ubuntu6_amd64.deb ...
+#14 23.69 Unpacking rpcsvc-proto (1.4.2-0ubuntu6) ...
+#14 23.71 Selecting previously unselected package libtirpc-dev:amd64.
+#14 23.71 Preparing to unpack .../27-libtirpc-dev_1.3.2-2ubuntu0.1_amd64.deb ...
+#14 23.72 Unpacking libtirpc-dev:amd64 (1.3.2-2ubuntu0.1) ...
+#14 23.74 Selecting previously unselected package libnsl-dev:amd64.
+#14 23.74 Preparing to unpack .../28-libnsl-dev_1.3.0-2build2_amd64.deb ...
+#14 23.75 Unpacking libnsl-dev:amd64 (1.3.0-2build2) ...
+#14 23.77 Selecting previously unselected package libc6-dev:amd64.
+#14 23.77 Preparing to unpack .../29-libc6-dev_2.35-0ubuntu3.13_amd64.deb ...
+#14 23.77 Unpacking libc6-dev:amd64 (2.35-0ubuntu3.13) ...
+#14 23.87 Selecting previously unselected package libstdc++-11-dev:amd64.
+#14 23.88 Preparing to unpack .../30-libstdc++-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 23.88 Unpacking libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 24.02 Selecting previously unselected package libgc1:amd64.
+#14 24.02 Preparing to unpack .../31-libgc1_1%3a8.0.6-1.1build1_amd64.deb ...
+#14 24.02 Unpacking libgc1:amd64 (1:8.0.6-1.1build1) ...
+#14 24.05 Selecting previously unselected package libobjc4:amd64.
+#14 24.05 Preparing to unpack .../32-libobjc4_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 24.05 Unpacking libobjc4:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 24.07 Selecting previously unselected package libobjc-11-dev:amd64.
+#14 24.08 Preparing to unpack .../33-libobjc-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 24.08 Unpacking libobjc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 24.11 Selecting previously unselected package libc6-i386.
+#14 24.11 Preparing to unpack .../34-libc6-i386_2.35-0ubuntu3.13_amd64.deb ...
+#14 24.11 Unpacking libc6-i386 (2.35-0ubuntu3.13) ...
+#14 24.20 Selecting previously unselected package lib32gcc-s1.
+#14 24.20 Preparing to unpack .../35-lib32gcc-s1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 24.20 Unpacking lib32gcc-s1 (12.3.0-1ubuntu1~22.04.3) ...
+#14 24.23 Selecting previously unselected package lib32stdc++6.
+#14 24.23 Preparing to unpack .../36-lib32stdc++6_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+#14 24.23 Unpacking lib32stdc++6 (12.3.0-1ubuntu1~22.04.3) ...
+#14 24.26 Selecting previously unselected package libclang-common-14-dev.
+#14 24.26 Preparing to unpack .../37-libclang-common-14-dev_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 24.26 Unpacking libclang-common-14-dev (1:14.0.0-1ubuntu1.1) ...
+#14 24.45 Selecting previously unselected package llvm-14-linker-tools.
+#14 24.45 Preparing to unpack .../38-llvm-14-linker-tools_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 24.46 Unpacking llvm-14-linker-tools (1:14.0.0-1ubuntu1.1) ...
+#14 24.49 Selecting previously unselected package libclang1-14.
+#14 24.49 Preparing to unpack .../39-libclang1-14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 24.50 Unpacking libclang1-14 (1:14.0.0-1ubuntu1.1) ...
+#14 24.57 Selecting previously unselected package clang-14.
+#14 24.57 Preparing to unpack .../40-clang-14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 24.58 Unpacking clang-14 (1:14.0.0-1ubuntu1.1) ...
+#14 24.61 Selecting previously unselected package clang.
+#14 24.61 Preparing to unpack .../41-clang_1%3a14.0-55~exp2_amd64.deb ...
+#14 24.61 Unpacking clang (1:14.0-55~exp2) ...
+#14 24.63 Selecting previously unselected package llvm-14-runtime.
+#14 24.63 Preparing to unpack .../42-llvm-14-runtime_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 24.63 Unpacking llvm-14-runtime (1:14.0.0-1ubuntu1.1) ...
+#14 24.66 Selecting previously unselected package llvm-runtime:amd64.
+#14 24.66 Preparing to unpack .../43-llvm-runtime_1%3a14.0-55~exp2_amd64.deb ...
+#14 24.66 Unpacking llvm-runtime:amd64 (1:14.0-55~exp2) ...
+#14 24.69 Selecting previously unselected package libpfm4:amd64.
+#14 24.69 Preparing to unpack .../44-libpfm4_4.11.1+git32-gd0b85fb-1ubuntu0.1_amd64.deb ...
+#14 24.69 Unpacking libpfm4:amd64 (4.11.1+git32-gd0b85fb-1ubuntu0.1) ...
+#14 24.72 Selecting previously unselected package llvm-14.
+#14 24.72 Preparing to unpack .../45-llvm-14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+#14 24.72 Unpacking llvm-14 (1:14.0.0-1ubuntu1.1) ...
+#14 24.87 Selecting previously unselected package llvm.
+#14 24.87 Preparing to unpack .../46-llvm_1%3a14.0-55~exp2_amd64.deb ...
+#14 24.88 Unpacking llvm (1:14.0-55~exp2) ...
+#14 24.92 Setting up gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 24.93 Setting up binutils-common:amd64 (2.38-4ubuntu2.12) ...
+#14 24.94 Setting up linux-libc-dev:amd64 (5.15.0-176.186) ...
+#14 24.95 Setting up libctf-nobfd0:amd64 (2.38-4ubuntu2.12) ...
+#14 24.96 Setting up libgomp1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 24.97 Setting up libasan6:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 24.98 Setting up libtirpc-dev:amd64 (1.3.2-2ubuntu0.1) ...
+#14 24.99 Setting up libpfm4:amd64 (4.11.1+git32-gd0b85fb-1ubuntu0.1) ...
+#14 25.00 Setting up rpcsvc-proto (1.4.2-0ubuntu6) ...
+#14 25.01 Setting up libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.02 Setting up libatomic1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.03 Setting up libgc1:amd64 (1:8.0.6-1.1build1) ...
+#14 25.04 Setting up libubsan1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.05 Setting up libmd0:amd64 (1.0.4-1build1) ...
+#14 25.06 Setting up libnsl-dev:amd64 (1.3.0-2build2) ...
+#14 25.06 Setting up libcrypt-dev:amd64 (1:4.4.27-1) ...
+#14 25.08 Setting up libc6-i386 (2.35-0ubuntu3.13) ...
+#14 25.10 Setting up libbinutils:amd64 (2.38-4ubuntu2.12) ...
+#14 25.12 Setting up libc-dev-bin (2.35-0ubuntu3.13) ...
+#14 25.13 Setting up libbsd0:amd64 (0.11.5-1) ...
+#14 25.14 Setting up liblsan0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.15 Setting up libitm1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.15 Setting up libicu70:amd64 (70.1-2) ...
+#14 25.16 Setting up libtsan0:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 25.17 Setting up libctf0:amd64 (2.38-4ubuntu2.12) ...
+#14 25.18 Setting up libedit2:amd64 (3.1-20210910-1build1) ...
+#14 25.19 Setting up libobjc4:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.20 Setting up lib32gcc-s1 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.20 Setting up lib32stdc++6 (12.3.0-1ubuntu1~22.04.3) ...
+#14 25.21 Setting up libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 25.22 Setting up libc6-dev:amd64 (2.35-0ubuntu3.13) ...
+#14 25.23 Setting up libxml2:amd64 (2.9.13+dfsg-1ubuntu0.11) ...
+#14 25.24 Setting up binutils-x86-64-linux-gnu (2.38-4ubuntu2.12) ...
+#14 25.25 Setting up libobjc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 25.26 Setting up binutils (2.38-4ubuntu2.12) ...
+#14 25.26 Setting up libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+#14 25.27 Setting up libllvm14:amd64 (1:14.0.0-1ubuntu1.1) ...
+#14 25.28 Setting up llvm-14-linker-tools (1:14.0.0-1ubuntu1.1) ...
+#14 25.29 Setting up libclang1-14 (1:14.0.0-1ubuntu1.1) ...
+#14 25.30 Setting up llvm-14-runtime (1:14.0.0-1ubuntu1.1) ...
+#14 25.31 Setting up llvm-runtime:amd64 (1:14.0-55~exp2) ...
+#14 25.32 Setting up libclang-common-14-dev (1:14.0.0-1ubuntu1.1) ...
+#14 25.33 Setting up libclang-cpp14 (1:14.0.0-1ubuntu1.1) ...
+#14 25.33 Setting up llvm-14 (1:14.0.0-1ubuntu1.1) ...
+#14 25.34 Setting up clang-14 (1:14.0.0-1ubuntu1.1) ...
+#14 25.35 Setting up clang (1:14.0-55~exp2) ...
+#14 25.39 Setting up llvm (1:14.0-55~exp2) ...
+#14 25.40 Processing triggers for libc-bin (2.35-0ubuntu3.13) ...
+#14 DONE 25.7s
+
+#27 [xdp-builder 3/5] WORKDIR /xdp
+#27 DONE 0.1s
+
+#28 [xdp-builder 4/5] COPY xdp/dns_filter.c .
+#28 DONE 0.1s
+
+#29 [xdp-builder 5/5] RUN clang -O2 -target bpf -c dns_filter.c -o dns_filter.o &&     echo "✅ XDP compiled successfully" ||     (echo "⚠️ XDP compilation failed" && touch dns_filter.o)
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 int xdp_dns_filter(struct xdp_md *ctx) {
+#29 0.164     ^
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 0.164 dns_filter.c:131:5: warning: loop not unrolled: the optimizer was unable to perform the requested transformation; the transformation might be disabled or specified as part of an unsupported transformation ordering [-Wpass-failed=transform-warning]
+#29 4.626 32 warnings generated.
+#29 4.630 ✅ XDP compiled successfully
+#29 DONE 4.7s
+
+#30 [stage-4  6/12] COPY --from=xdp-builder /xdp/dns_filter.o /etc/xdp/dns_filter.o
+#30 DONE 0.1s
+
+#31 [stage-4  7/12] COPY xdp/xdp_manager.sh /etc/xdp/xdp_manager.sh
+#31 DONE 0.1s
+
+#32 [stage-4  8/12] RUN chmod +x /etc/xdp/xdp_manager.sh
+#32 DONE 0.1s
+
+#33 [stage-4  9/12] COPY supervisord.conf /etc/supervisord.conf
+#33 DONE 0.1s
+
+#34 [stage-4 10/12] COPY pdns_config/ /etc/powerdns/
+#34 DONE 0.0s
+
+#35 [stage-4 11/12] COPY --from=lua-c-builder /c-ext/bloom_native.so /etc/powerdns/bloom_native.so
+#35 DONE 0.0s
+
+#36 [stage-4 12/12] RUN mkdir -p /var/run/pdns-recursor /var/run/unbound /var/log/supervisor /data /etc/powerdns/tls /sys/fs/bpf &&     mkdir -p /etc/unbound &&     touch /etc/powerdns/forward_zones.txt /etc/powerdns/laman_labuh.lua /etc/powerdns/rpz_feeds.txt /etc/powerdns/allowed_ips.txt /etc/powerdns/rpz_compiled.zone /etc/powerdns/custom_blacklist.zone /etc/powerdns/custom_whitelist.zone &&     chown recursor:recursor /var/run/pdns-recursor && chown unbound:unbound /etc/unbound /var/run/unbound
+#36 DONE 0.1s
+
+#37 exporting to image
+#37 exporting layers
+#37 exporting layers 9.2s done
+#37 exporting manifest sha256:60f9c2cd0527f44656e2e07089cf71338dd8898679480fb0327b7cc4c864fc49 0.0s done
+#37 exporting config sha256:336aa29b5a58abbec3423b82ce16b8be85b5e9ff5892134f33e3c44948baa18b 0.0s done
+#37 exporting attestation manifest sha256:e06b3228af6887c093f5abd793310436a9de4b77194959250ab4c625a836078f 0.0s done
+#37 exporting manifest list sha256:fac30bbdf5dffd34f4a33eb05fffc4ff52b703ecfcee52490b453235050ae064 done
+#37 naming to docker.io/library/netshield-dns-image:latest done
+#37 unpacking to docker.io/library/netshield-dns-image:latest
+#37 unpacking to docker.io/library/netshield-dns-image:latest 1.3s done
+#37 DONE 10.6s
+[Docker] Meluncurkan DNS Engine (Native Docker Run menghemat limit dependencies)...
+netshield-v2
+c43dfb487bfdc98f8f801b6187945e9b724e82f128f860d8f9da524b9db20ac2
+[Docker] Membersihkan sisa-sisa image lama (Prune)...
+Deleted build cache objects:
+ml5le06anpvmaemu7ygzyockd
+sx4zjgcqjpn9ajsgl4x3uf3kp
+vyfeuyfea6k5ttdylzxocgvit
+xrgvnhwz7ian84g26ihfbw6m8
+6y490g7qtwf2hy3qyhw291zgm
+q8mecry2lw9he1ozhoba5hdsj
+slktljqi9q5r291uudrnsgdrn
+nhl898o9dz224qtob0t8fbiqu
+kwyais4be1co6g678gtua20kb
+8pvq3t2n8wpz232pnj6eme8x1
+8zaotqb0yb33nt4fg8lkvnloh
+msyefyxh760unt9b3d5bwks77
+pq7wafix8wofln5gbsv0xn8dy
+rmu5blyj3u202mq65pi2cwa2e
+di5xl4z1ktkcc1dbkw1krf08e
+xvtxvxgcf4pmm23w74cp6eitn
+gm28qcqqvzq42cpqf2z4rghdx
+gr53f378yib4pjmjjuevlvbl7
+bxhy5tcf7gzbf3xheox8jbtge
+idarbcuj030fcc2jgje76den8
+d3xpgfpixdja3snsl6s8bppjm
+ipackcb0hsec4p6wrfq0vcoiw
+yuff0i1zzpxqa006fnki964hr
+qg5y1lcmvlynob6p0h89ccrut
+f0vcvwiyy3fbla1iw2lh05p8d
+qoodeidwxr2u6aoc3fzu6dof2
+8dhpd8i0zjibwovibx9g45byv
+4xiocbbxifxm203908rlab6t0
+xyncilx7aofgyoqha33rouukk
+ktmcoq74i3m4wboxy8o64uppv
+d9nclo3omdcn3h60ssp8l2xuy
+xxqt6ext5bjg1xcklw37cwdwg
+kan3ih1g1sq27j06ts0a1wmnj
+yubvvvilku8t7mu2nwhw5mgh0
+7372qzanvzsm29zefp4jofpdo
+iejlpde8zqa1o49zksg4iyvui
+ehn1386ux6enuy57kxnom8m50
+jg02bg439v9m25wfagva5gvdm
+lhdevv61h7u0bnrqau93w6ia1
+p25widh1m87o6v466olelv5r6
+jt7z4huaeifdz545aqgwy8p3e
+skjfh9i6um11uct786lu7dckz
+jsrkmz534wl99eba7jp1d4oap
+mgijkyp2psli8dfo0r4olj5x1
+lvlmaib6kjjw4f20qt8hgd2zh
+wc6dun6n3m8tm8tl5soo8pzjz
+20xqrkyttfc6db0qjrg285rwh
+7jb2heubj9p2sq328nx40ciz0
+80ygaro3lokc68950do424hgw
+r0sel9oyod6u0fwff2j6wwz1a
+qk1qfsyvsamag4qpjsfv7q46s
+iij9wg8ea9b61wn2p07r6265k
+x7k4lpklbjidkglacaq53j1c9
+sg0p4pytayvpo0p70f9y7b9hh
+j0b47ztt4vo6idirkf9sk8pju
+g4ay0u4sze3usnvlj7h6qs7n5
+xywymv5qwikfwdey4nj0fx2bx
+ou51i082hwjv3cg8220kv1va0
+lqa9fbjhznwmhr8wvyv3o0635
+uw93qd2b4gfghrgxas92td02y
+dj2m2meaqxmbcmdjwa8ub7r1m
+6gm4w18l5qqoxn5gmaidkv2me
+f0eua0s71zaoi49g0gt5ab337
+uvq8lssa0no83q5qgog5l2ph7
+ho4uorce62amxw4hjtzhthxhe
+5ixjyh7wv85fxjt3wegkw7cz1
+oh7f18lpoy27mpjaamqpyys42
+amywwlc5ryfnizzgih7jo99s3
+ch0v5b6oz0tu25ydc68glr8lg
+vzcnkvpn5d9buzzlyp0tc2t1f
+xx6cry9pa3nmshgmryoljecwu
+14xzg8jjmjgh12mw6o2v7nfmo
+9rxp6hytquycs6ucq81frmorf
+i18hfgua5ogapz7z1uzgfh5ij
+u24zvtwcle7vns0gh0qm1ko7e
+z5mjzziq6ahqtbh18ngpozlil
+rqamvt5ijocnra8qwo0cpsdcz
+samjt6nyqlnscovb5g4erlben
+7psqhn3luapozvuxvtk7folju
+8o3rnkitpghhbqqlbrgz1oh8n
+q17v36cpd3rok7my2e6rfk8gf
+hzkuo1py0hrszzq7ug9ubzg9z
+ipxdr08fxoqmasa7x81apu10a
+kc2parjz7mtfs7f118aadyeek
+ozja7kupcdfrin95yqf0xdaeq
+twfgog2rr5klps6ls8qmfccm3
+95z6rx0k1u8440cl592d6ooly
+ribertk2gh6qcqcaqv2qb47fq
+u3qkbbtyjm8fkygftny4wgei9
+ut25ttwuckjwd4y9h8h8cfdaw
+aqpaqxebv0mkyc67ctamue203
+qn4slz87h5vyyyhaxhab16hjy
+6dsbse9mxx5didkr4j9bzov3j
+c4aunhq4w7qw8sztf4mk52mbs
+nchhkgc7b8rvnxsz64hc9d6qm
+r1gmykookqbsftskzq3n67ha6
+s2hpcefd8ljdm31vh1zynk5gs
+4tbh0n7hv8r9wbzerb15oyqdq
+z4abg4s3oriepsv8m0wn46hps
+bvshyf42ljjirysjmk473fnoq
+1m7j5vcaxhs4sqgm9xlk93qdg
+190doodca6h1u10nwa8bvhxde
+tuvzmwukbbg0tyzm6ogmnlgvu
+q7shy6atfkeaiqv2dj4569yv3
+mhp0w5pce27248m89ortiw8w6
+oq83ckd49aacio37n5doy7nuz
+9tu3v0pexo0sqzeohbiz0mo55
+m3l8xf6plzeyfa6tzl7vd7v9f
+wybhhnkzp6ws6dbvqfg6skuyc
+khqkzm2ro25iho5j3ymdtpr8e
+43d19bkagldz2yhp83vm5a1s4
+cwkvlfu5nnvwsanxorj8p85cb
+qvd4phnqdo45ywu43iaywqn6v
+nmzz09cyb428ha9njs6ska67p
+ua8x1pfc6if6cyvlpk9g84ikw
+pa5vxrngfiflplh758bo9g6i2
+xi6t9huzqjg1463el6tibhfto
+p28lfshavm8jy4ip60vddnoe4
+tqvyi938kbr8gctjvsrw46n9f
+w8olw2du80lqikwtstjfbk0hz
+azx5dbzctibadexzm92lvh1p4
+s3kzxvxx0xi6ror4sof8pe3qq
+nsnocnhv4i37vfbf9vspka7rv
+p4krgi921vhsl0q73prp442tw
+rcp9e4y5g2uu2zadv6iwkvoae
+unq1owgnz0q4wmi3o59v4qww1
+yoklggvznjgrqzihu3hi4z3gz
+r05krm3uxi3ey10rsd0ufrc75
+lvfel7h4ko8hszh0mhhkevmb9
+lc4gm7lpafcpprunmnnea1jpa
+cd0a8ehmgmyg78h2plzuwuutg
+kn7ozlmniqqbpew3xjd84rpll
+tlhxau9dszgalf05pjyft313u
+pys9xah6r7hs8y377jbga3qyl
+xc9njrz6ujwjhtb2m9l9mszag
+tx66hg0jo6r6t2r8d3q8da5gf
+qtfu6cn9n88z6vmnyu2v3ouov
+znmp69jg0861yj9abp5folipn
+ee2yit95rqa2ty9xi75vu2e2s
+q2jej3z3hdd8njf67pwrgxwo1
+jchlyj99t52gbwewq2oexzc6x
+gi1pwpg4klsxu77jtu63ojhud
+kh8sfeni07p35fkjxqmeieujl
+0w1mi492ms3z0iwkvzm3khm2l
+ojzcxlfexn9zafm8ia2uzma5i
+0ykeidxkum36lq5v23k63wf2j
+j02pwnsuunqqzzrh42t6otuns
+nojnazzg4753fl7vybcf6ku05
+a49m2qp8avm3p4l315rloqsef
+076fz2qmmlctk4afa357hvf71
+2oeuiymq15azzt1w5lzzg602p
+mfc2j5duu0gqj4dncx4ta6esi
+w0wot14yc2xt80qlxw0hkamh3
+pyzc9ug1hkivynyagw2mpfbik
+w90soigv2izvhvo1jlucbsrbd
+r979cittpw7i7axjlwlv76gqf
+ax8jxjvgm5lxl9gktdcgr8mj3
+0jdo0bt51dhelvy5uxfyft8bj
+lgs920xtkfrjzob3ila6prsvo
+q5jvy6pyfgnyuyefpb82q6z9v
+6003f5jwy4wp9jjltc4rwvps9
+udv8tcpczob8dkqhgpgo7g9de
+zp6pb6giabu4b1vj43sz96dhq
+v8ycniresmunw5v0e7mt9ultx
+
+Total reclaimed space: 12.57GB

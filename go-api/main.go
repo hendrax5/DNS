@@ -298,6 +298,44 @@ func main() {
     api.Get("/top-analytics", GetTopAnalytics)
     api.Get("/check-domain", CheckDomainBlock)
 	api.Get("/dig-health", GetDigHealth)
+	
+	// Slave Sync Middleware & Endpoints
+	syncGuard := func(c *fiber.Ctx) error {
+		var role, slaveIps string
+		db.QueryRow("SELECT value FROM settings WHERE key = 'node_role'").Scan(&role)
+		db.QueryRow("SELECT value FROM settings WHERE key = 'slave_ips'").Scan(&slaveIps)
+		
+		if role != "master" {
+			return c.Status(403).JSON(fiber.Map{"error": "Node ini bukan master"})
+		}
+		
+		clientIP := c.IP()
+		allowed := false
+		for _, sip := range strings.Split(slaveIps, "\n") {
+			if strings.TrimSpace(sip) == clientIP {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(403).JSON(fiber.Map{"error": "IP tidak diizinkan untuk sinkronisasi"})
+		}
+		return c.Next()
+	}
+	
+	syncApi := api.Group("/sync", syncGuard)
+	syncApi.Get("/bloom", func(c *fiber.Ctx) error {
+		return c.SendFile("/etc/powerdns/bloom.bin")
+	})
+	syncApi.Get("/rpz", func(c *fiber.Ctx) error {
+		return c.SendFile("/etc/powerdns/rpz_compiled.zone")
+	})
+	syncApi.Get("/blacklist", func(c *fiber.Ctx) error {
+		return c.SendFile("/etc/powerdns/custom_blacklist.zone")
+	})
+	syncApi.Get("/whitelist", func(c *fiber.Ctx) error {
+		return c.SendFile("/etc/powerdns/custom_whitelist.zone")
+	})
 
 	// Auth Middleware
 	authGuard := func(c *fiber.Ctx) error {
@@ -337,6 +375,9 @@ func main() {
 
 	admin.Get("/forwarders", GetForwarders)
 	admin.Post("/forwarders", SaveForwarders)
+
+	admin.Get("/topology", GetTopology)
+	admin.Post("/topology", SaveTopology)
 
 	admin.Get("/search-rpz", SearchRPZ)
 
@@ -446,6 +487,9 @@ func initDB() {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('upstream_resolvers', '1.1.1.1,8.8.8.8,9.9.9.9')`)
 	db.Exec(`UPDATE settings SET value = '1440' WHERE key = 'rpz_sync_interval' AND value = '1'`)
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('rpz_axfr_feeds', '[{"master_ip":"182.23.79.202","zone_name":"trustpositifkominfo","enabled":false},{"master_ip":"139.255.196.202","zone_name":"trustpositifkominfo","enabled":false}]')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('node_role', 'master')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('master_node_url', '')`)
+	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('slave_ips', '')`)
 	db.Exec(`UPDATE settings SET value = '[{"url":"https://trustpositif.komdigi.go.id/assets/db/domains_isp","enabled":true}]' WHERE key = 'rpz_feeds' AND value NOT LIKE '[%'`)
 
 	// Inject new komdigi default and remove legacy kominfo feeds from DB
@@ -1179,6 +1223,38 @@ func SaveForwarders(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Forwarders updated successfully"})
 }
 
+func GetTopology(c *fiber.Ctx) error {
+	var role, masterUrl, slvIps string
+	db.QueryRow("SELECT value FROM settings WHERE key = 'node_role'").Scan(&role)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'master_node_url'").Scan(&masterUrl)
+	db.QueryRow("SELECT value FROM settings WHERE key = 'slave_ips'").Scan(&slvIps)
+	if role == "" { role = "master" }
+	return c.JSON(fiber.Map{
+		"node_role": role,
+		"master_node_url": masterUrl,
+		"slave_ips": slvIps,
+	})
+}
+
+func SaveTopology(c *fiber.Ctx) error {
+	var req struct {
+		NodeRole      string `json:"node_role"`
+		MasterNodeUrl string `json:"master_node_url"`
+		SlaveIps      string `json:"slave_ips"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
+	}
+	if req.NodeRole != "master" && req.NodeRole != "slave" {
+		req.NodeRole = "master"
+	}
+	
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'node_role'", req.NodeRole)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'master_node_url'", req.MasterNodeUrl)
+	db.Exec("UPDATE settings SET value = ? WHERE key = 'slave_ips'", req.SlaveIps)
+	return c.JSON(fiber.Map{"message": "Topologi Node berhasil diperbarui"})
+}
+
 func GetUpstreamConfig(c *fiber.Ctx) error {
 	var fwds string
 	db.QueryRow(`SELECT value FROM settings WHERE key = 'parent_resolvers'`).Scan(&fwds)
@@ -1286,6 +1362,70 @@ func syncRPZWorker() {
 	}
 
 	for {
+		var role string
+		db.QueryRow("SELECT value FROM settings WHERE key = 'node_role'").Scan(&role)
+		
+		if role == "slave" {
+			var masterURL string
+			db.QueryRow("SELECT value FROM settings WHERE key = 'master_node_url'").Scan(&masterURL)
+			if masterURL != "" {
+				masterURL = strings.TrimSuffix(masterURL, "/")
+				addWorkerLog("SLAVE WORKER", "Memulai tarikan binari statik dari Master Node...")
+				
+				// 1. Download Bloom Filter mmap
+				respB, err := http.Get(masterURL + "/api/sync/bloom")
+				if err == nil && respB.StatusCode == 200 {
+					outB, _ := os.Create("/etc/powerdns/bloom.bin.tmp")
+					io.Copy(outB, respB.Body)
+					outB.Close()
+					respB.Body.Close()
+					os.Rename("/etc/powerdns/bloom.bin.tmp", "/etc/powerdns/bloom.bin")
+					
+					// Force swap atomic since we bypassed go compilation
+					exec.Command("dnsdist", "-e", "reload_bloom()").Run()
+				}
+				
+				// 2. Download Compiled RPZ
+				respR, err := http.Get(masterURL + "/api/sync/rpz")
+				if err == nil && respR.StatusCode == 200 {
+					outR, _ := os.Create("/etc/powerdns/rpz_compiled.zone.tmp")
+					io.Copy(outR, respR.Body)
+					outR.Close()
+					respR.Body.Close()
+					os.Rename("/etc/powerdns/rpz_compiled.zone.tmp", "/etc/powerdns/rpz_compiled.zone")
+				}
+				
+				// 3. Download Custom Blacklist
+				respCb, err := http.Get(masterURL + "/api/sync/blacklist")
+				if err == nil && respCb.StatusCode == 200 {
+					outCb, _ := os.Create("/etc/powerdns/custom_blacklist.zone")
+					io.Copy(outCb, respCb.Body)
+					outCb.Close()
+					respCb.Body.Close()
+				}
+
+				// 4. Download Custom Whitelist
+				respCw, err := http.Get(masterURL + "/api/sync/whitelist")
+				if err == nil && respCw.StatusCode == 200 {
+					outCw, _ := os.Create("/etc/powerdns/custom_whitelist.zone")
+					io.Copy(outCw, respCw.Body)
+					outCw.Close()
+					respCw.Body.Close()
+				}
+				
+				exec.Command("rec_control", "reload-zones").Run()
+				addWorkerLog("SLAVE WORKER", "Injeksi mmap dan zones sukses tanpa beban CPU. Tertidur menunggu siklus berikutnya.")
+			} else {
+				addWorkerLog("SLAVE WORKER", "Peringatan: URL Master Node belum diatur, sinkronisasi dibatalkan.")
+			}
+			
+			select {
+			case <-time.After(time.Duration(interval) * time.Minute):
+			case <-forceSync:
+			}
+			continue
+		}
+
 		var value string
 		err := db.QueryRow("SELECT value FROM settings WHERE key = 'rpz_feeds'").Scan(&value)
 		if err == nil && value != "" {

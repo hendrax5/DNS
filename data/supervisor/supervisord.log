@@ -1,0 +1,29 @@
+2026-04-24 17:21:19,732 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
+2026-04-24 17:21:19,735 INFO supervisord started with pid 1
+2026-04-24 17:21:20,736 INFO spawned: 'dnsdist' with pid 7
+2026-04-24 17:21:20,738 INFO spawned: 'unbound' with pid 8
+2026-04-24 17:21:20,739 INFO spawned: 'pdns' with pid 9
+2026-04-24 17:21:20,739 INFO spawned: 'gobgp' with pid 10
+2026-04-24 17:21:20,740 INFO spawned: 'go-api' with pid 11
+2026-04-24 17:21:20,747 WARN exited: gobgp (exit status 1; not expected)
+2026-04-24 17:21:20,748 WARN exited: pdns (exit status 1; not expected)
+2026-04-24 17:21:20,781 WARN exited: dnsdist (exit status 1; not expected)
+2026-04-24 17:21:22,558 INFO spawned: 'dnsdist' with pid 77
+2026-04-24 17:21:22,558 INFO success: unbound entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-04-24 17:21:22,559 INFO spawned: 'pdns' with pid 78
+2026-04-24 17:21:22,560 INFO spawned: 'gobgp' with pid 79
+2026-04-24 17:21:22,561 INFO success: go-api entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-04-24 17:21:22,570 WARN exited: pdns (exit status 1; not expected)
+2026-04-24 17:21:22,598 WARN exited: dnsdist (exit status 1; not expected)
+2026-04-24 17:21:24,555 INFO success: gobgp entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-04-24 17:21:24,793 INFO spawned: 'dnsdist' with pid 104
+2026-04-24 17:21:24,794 INFO spawned: 'pdns' with pid 105
+2026-04-24 17:21:24,803 WARN exited: pdns (exit status 1; not expected)
+2026-04-24 17:21:24,831 WARN exited: dnsdist (exit status 1; not expected)
+2026-04-24 17:21:27,886 INFO spawned: 'dnsdist' with pid 123
+2026-04-24 17:21:27,887 INFO spawned: 'pdns' with pid 124
+2026-04-24 17:21:27,898 WARN exited: pdns (exit status 1; not expected)
+2026-04-24 17:21:27,898 INFO gave up: pdns entered FATAL state, too many start retries too quickly
+2026-04-24 17:21:27,926 WARN exited: dnsdist (exit status 1; not expected)
+2026-04-24 17:21:28,808 INFO gave up: dnsdist entered FATAL state, too many start retries too quickly
+2026-04-24 17:21:47,747 INFO reaped unknown pid 229 (exit status 0)
