@@ -1834,7 +1834,7 @@ function App() {
                     <div className="p-6">
                       <p className="text-sm text-slate-400 mb-6">Pilih Mode Operasional Server. <b>Master</b> (Data Cruncher) menarik HTTP Feed lalu membuka API pendistribusi biner. <b>Slave</b> bertindak 100% pasif dengan mengunduh <code>bloom.bin</code> matang dari Master tanpa beban CPU (<span className="italic">Zero-CPU Spike</span>).</p>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <button onClick={() => setTopology({...topology, node_role: 'master'})} className={`p-4 border rounded-xl text-left transition-all ${topology.node_role === 'master' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/50'}`}>
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-sm font-bold ${topology.node_role === 'master' ? 'text-purple-400' : 'text-slate-300'}`}>Mode Master Pusat</span>
@@ -1849,6 +1849,14 @@ function App() {
                             {topology.node_role === 'slave' && <CheckCircle2 className="w-5 h-5 text-indigo-500" />}
                           </div>
                           <p className="text-xs text-slate-500">Trafik DNS Murni. Menonaktifkan penarikan upstream dan fokus filter data lokal murni.</p>
+                        </button>
+
+                        <button onClick={() => setTopology({...topology, node_role: 'standalone'})} className={`p-4 border rounded-xl text-left transition-all ${topology.node_role === 'standalone' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-700 hover:border-slate-500 bg-slate-900/50'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-sm font-bold ${topology.node_role === 'standalone' ? 'text-emerald-400' : 'text-slate-300'}`}>Mode Standalone</span>
+                            {topology.node_role === 'standalone' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+                          </div>
+                          <p className="text-xs text-slate-500">Berdiri sendiri. Menarik feed dan memfilter DNS secara mandiri (tanpa API sinkronisasi).</p>
                         </button>
                       </div>
 

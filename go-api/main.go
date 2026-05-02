@@ -1247,8 +1247,8 @@ func SaveTopology(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
-	if req.NodeRole != "master" && req.NodeRole != "slave" {
-		req.NodeRole = "master"
+	if req.NodeRole != "master" && req.NodeRole != "slave" && req.NodeRole != "standalone" {
+		req.NodeRole = "standalone"
 	}
 	
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'node_role'", req.NodeRole)
