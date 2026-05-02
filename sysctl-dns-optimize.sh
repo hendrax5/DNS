@@ -31,14 +31,24 @@ net.netfilter.nf_conntrack_max=2000000
 fs.file-max=2097152
 
 # Low Latency Polling (Bypass IRQ Wait / Kurangi Syscall Overhead)
-net.core.busy_poll=50
-net.core.busy_read=50
+# Dimatikan (0) untuk mencegah CPU 100% pada NIC KVM/AMD yang tidak kompatibel
+net.core.busy_poll=0
+net.core.busy_read=0
 EOF
 
 # Reload Konfigurasi
 sysctl -p /etc/sysctl.d/99-netshield-dns.conf
 
-# (GRUB and ethtool overrides removed due to KVM/AMD performance issues)
+# Clean up problematic GRUB settings from older versions
+if [ -f "/etc/default/grub" ]; then
+    echo "Membersihkan parameter GRUB agresif yang dapat menyebabkan freeze/slowdown..."
+    sed -i 's/clocksource=tsc//g' /etc/default/grub
+    sed -i 's/tsc=reliable//g' /etc/default/grub
+    sed -i 's/intel_idle.max_cstate=1//g' /etc/default/grub
+    sed -i 's/idle=poll//g' /etc/default/grub
+    update-grub || true
+fi
+
 echo "---------------------------------------------------------"
 echo "✔ Optimization Applied Successfully!"
 echo "Sangat disarankan menjalankan NetShield DNS menggunakan 'docker-compose up -d' agar ulimit file dapat ter-load."
