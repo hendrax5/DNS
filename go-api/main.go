@@ -792,39 +792,41 @@ func SaveAdvancedConfig(c *fiber.Ctx) error {
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'tproxy_enabled'", tproxyStr)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'max_qps_per_ip'", maxQpsStr)
 
-	// Execute TProxy nftables
-	exec.Command("bash", "-c", "nft add table ip netshield_nat || true").Run()
-	exec.Command("bash", "-c", "nft flush table ip netshield_nat").Run()
-	exec.Command("bash", "-c", "nft add chain ip netshield_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'").Run()
-	
-	if req.Tproxy {
-		exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting udp dport 53 redirect to :53").Run()
-		exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 53 redirect to :53").Run()
-		exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 80 redirect to :53").Run()
-	}
+	go func(maxQPS int, tproxy bool) {
+		// Execute TProxy nftables
+		exec.Command("bash", "-c", "nft add table ip netshield_nat || true").Run()
+		exec.Command("bash", "-c", "nft flush table ip netshield_nat").Run()
+		exec.Command("bash", "-c", "nft add chain ip netshield_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'").Run()
+		
+		if tproxy {
+			exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting udp dport 53 redirect to :53").Run()
+			exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 53 redirect to :53").Run()
+			exec.Command("bash", "-c", "nft add rule ip netshield_nat prerouting tcp dport 80 redirect to :53").Run()
+		}
 
-	generateLuaConfig()
+		generateLuaConfig()
 
-	// Update DNSDist Config for Max QPS
-	b, err := ioutil.ReadFile("/etc/powerdns/dnsdist.conf")
-	if err == nil {
-		lines := strings.Split(string(b), "\n")
-		changed := false
-		for i, line := range lines {
-			if strings.Contains(line, "MaxQPSIPRule") {
-				if req.MaxQPS > 0 {
-					lines[i] = fmt.Sprintf("addAction(MaxQPSIPRule(%d), TCAction())", req.MaxQPS)
-				} else {
-					lines[i] = "-- addAction(MaxQPSIPRule(1000), DropAction())"
+		// Update DNSDist Config for Max QPS
+		b, err := ioutil.ReadFile("/etc/powerdns/dnsdist.conf")
+		if err == nil {
+			lines := strings.Split(string(b), "\n")
+			changed := false
+			for i, line := range lines {
+				if strings.Contains(line, "MaxQPSIPRule") {
+					if maxQPS > 0 {
+						lines[i] = fmt.Sprintf("addAction(MaxQPSIPRule(%d), TCAction())", maxQPS)
+					} else {
+						lines[i] = "-- addAction(MaxQPSIPRule(1000), DropAction())"
+					}
+					changed = true
 				}
-				changed = true
+			}
+			if changed {
+				ioutil.WriteFile("/etc/powerdns/dnsdist.conf", []byte(strings.Join(lines, "\n")), 0644)
+				exec.Command("supervisorctl", "restart", "dnsdist").Run()
 			}
 		}
-		if changed {
-			ioutil.WriteFile("/etc/powerdns/dnsdist.conf", []byte(strings.Join(lines, "\n")), 0644)
-			exec.Command("supervisorctl", "restart", "dnsdist").Run()
-		}
-	}
+	}(req.MaxQPS, req.Tproxy)
 
 	return c.JSON(fiber.Map{"message": "Advanced config updated"})
 }
