@@ -1222,7 +1222,7 @@ func SaveForwarders(c *fiber.Ctx) error {
 	db.Exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('resolver_mode', ?)", resMode)
 
 	generateForwardersConfig()
-	go GenerateConfigs()
+	exec.Command("rec_control", "reload-zones").Run()
 
 	return c.JSON(fiber.Map{"message": "Forwarders updated successfully"})
 }
@@ -1256,6 +1256,13 @@ func SaveTopology(c *fiber.Ctx) error {
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'node_role'", req.NodeRole)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'master_node_url'", req.MasterNodeUrl)
 	db.Exec("UPDATE settings SET value = ? WHERE key = 'slave_ips'", req.SlaveIps)
+
+	// Trigger sinkronisasi otomatis
+	select {
+	case forceSync <- true:
+	default:
+	}
+
 	return c.JSON(fiber.Map{"message": "Topologi Node berhasil diperbarui"})
 }
 
@@ -1334,8 +1341,7 @@ func SaveUpstreamConfig(c *fiber.Ctx) error {
 	db.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('resolver_mode', ?)`, rMode)
 	db.Exec(`UPDATE settings SET value = ? WHERE key = 'resolver_mode'`, rMode)
 
-	// Call Configuration Template Engine
-	go GenerateConfigs()
+	exec.Command("rec_control", "reload-zones").Run()
 
 	return c.JSON(fiber.Map{"status": "success", "message": "Upstream config saved, backend reloading..."})
 }
